@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countdown, countdownLabel, currentStopIndex, fromLocalInput, sleighPosition, toLocalInput } from './time';
+import { countdown, countdownLabel, currentStopIndex, fromLocalInput, newlyCompleted, sleighPosition, toLocalInput } from './time';
 import type { Stop } from './types';
 
 const stop = (p: Partial<Stop>): Stop => ({
@@ -54,5 +54,16 @@ describe('posición del trineo', () => {
   });
   it('sin coordenadas no hay trineo en el mapa', () => {
     expect(sleighPosition([stop({})], 0)).toBeNull();
+  });
+});
+
+describe('paradas recién completadas (sin WebSocket)', () => {
+  const stop = (id: string, done: boolean) => ({ id, completed_at: done ? '2026-12-24T10:00:00Z' : null }) as Stop;
+  it('no celebra en la primera carga', () => {
+    expect(newlyCompleted(null, [stop('a', true)])).toEqual([]);
+  });
+  it('celebra solo las que se completaron desde la consulta anterior', () => {
+    const seen = new Set(['a']);
+    expect(newlyCompleted(seen, [stop('a', true), stop('b', true), stop('c', false)]).map((s) => s.id)).toEqual(['b']);
   });
 });

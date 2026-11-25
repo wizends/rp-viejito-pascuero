@@ -1,10 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Snowflake, Star } from 'lucide-react';
 import { api } from '@/lib/api';
-import { countdown, currentStopIndex } from '@/lib/time';
+import { countdown, currentStopIndex, newlyCompleted } from '@/lib/time';
 import type { Stop, Tracking } from '@/lib/types';
 import { useSocket } from '@/lib/ws';
 import { useReducedMotion } from '@/lib/useReducedMotion';
@@ -21,9 +21,9 @@ export default function TrackingPage() {
   const { code = '' } = useParams();
   const qc = useQueryClient();
   const key = ['tracking', code];
-  // además del WebSocket, consulta cada minuto: en Vercel las paradas con hora avanzan
-  // al consultarse y así no dependen de un proceso de fondo
-  const q = useQuery({ queryKey: key, queryFn: () => api.tracking(code), retry: false, refetchInterval: 60_000 });
+  // Consulta cada 15 s: en Vercel no hay WebSocket y las paradas con hora avanzan al
+  // consultarse. En Docker el WebSocket además avisa al instante.
+  const q = useQuery({ queryKey: key, queryFn: () => api.tracking(code), retry: false, refetchInterval: 15_000 });
   const [celebrate, setCelebrate] = useState<Stop | null>(null);
   const [skew, setSkew] = useState(0);
   const [now, setNow] = useState(() => Date.now());
@@ -37,12 +37,28 @@ export default function TrackingPage() {
     return () => clearInterval(id);
   }, []);
 
+  // paradas ya celebradas (por WebSocket o por consulta), para no repetir
+  const seen = useRef<Set<string> | null>(null);
+  const party = (s: Stop) => {
+    seen.current?.add(s.id);
+    setCelebrate(s);
+    if (useLights.getState().audio) playBells();
+    setTimeout(() => setCelebrate(null), 4200);
+  };
+  useEffect(() => {
+    if (!q.data) return;
+    const fresh = newlyCompleted(seen.current, q.data.stops);
+    seen.current = new Set(q.data.stops.filter((s) => s.completed_at).map((s) => s.id));
+    const last = fresh[fresh.length - 1];
+    if (last) party(last);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q.data]);
+
   useSocket(q.data ? `/ws/tracking/${encodeURIComponent(code)}` : null, (msg) => {
     if (msg.event === 'tracking.updated') qc.setQueryData<Tracking>(key, msg.data as Tracking);
     if (msg.event === 'tracking.stop_completed') {
-      setCelebrate(msg.data as Stop);
-      if (useLights.getState().audio) playBells();
-      setTimeout(() => setCelebrate(null), 4200);
+      const s = msg.data as Stop;
+      if (!seen.current?.has(s.id)) party(s);
     }
   });
 

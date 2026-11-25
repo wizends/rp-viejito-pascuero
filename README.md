@@ -15,16 +15,16 @@ cp .env.example .env      # en Windows: copy .env.example .env
 docker compose up --build
 ```
 
-Luego abre **http://localhost:8080**. Docker levanta dos servicios: `frontend` (nginx con la web) y `backend` (API en Go, unos 25 MB). La base SQLite, con las fotos de las cartas adentro, vive en el volumen `datos`. Con `DATABASE_URL` y `REDIS_URL` el mismo backend usa PostgreSQL y Redis, como en Vercel.
+Luego abre **http://localhost:8080**. Docker levanta dos servicios: `frontend` (nginx con la web) y `backend` (API en Go, unos 25 MB). La base SQLite, con las fotos de las cartas adentro, vive en el volumen `datos`. Con `DATABASE_URL` (y opcionalmente `REDIS_URL`) el mismo backend usa PostgreSQL y Redis, como en Vercel.
 
 ## Publicar en Vercel
 
-La web y la API se publican juntas en **un solo proyecto de Vercel** con [Vercel Services](https://vercel.com/docs/services) (beta): `vercel.json` en la raíz define el servicio `web` (Vite, carpeta `frontend/`) y el servicio `api` (Go, carpeta `backend/`), y enruta `/api/*` y `/ws/*` a la API y todo lo demás a la web. Mismo dominio: cookies de sesión, CSRF y WebSockets funcionan sin proxy.
+La web y la API se publican juntas en **un solo proyecto de Vercel** con [Vercel Services](https://vercel.com/docs/services) (beta): `vercel.json` en la raíz define el servicio `web` (Vite, carpeta `frontend/`) y el servicio `api` (Go, carpeta `backend/`), y enruta `/api/*` y `/ws/*` a la API y todo lo demás a la web. Mismo dominio: cookies de sesión y CSRF funcionan sin proxy. Todo con planes gratuitos: Vercel Hobby, Neon y (opcional) Redis.
 
 1. **Importa el repo** en Vercel con la **raíz del repositorio** como Root Directory (no `frontend/` ni `backend/`): `vercel.json` describe los dos servicios.
-2. **Conecta el almacenamiento** desde la pestaña *Storage* del proyecto:
-   - **Neon** (PostgreSQL): define `DATABASE_URL`. Ahí viven las cuentas, cartas, fotos y trayectos.
-   - **Redis**: define `REDIS_URL`. En Vercel cada WebSocket queda fijo en una instancia; Redis reparte los eventos entre ellas para que el aviso de "carta leída" o de la parada completada llegue a quien lo está mirando.
+2. **Conecta el almacenamiento** desde la pestaña *Storage* del proyecto (ambos con plan gratuito):
+   - **Neon** (PostgreSQL), obligatorio: define `DATABASE_URL`. Ahí viven las cuentas, cartas, fotos y trayectos.
+   - **Redis**, opcional: define `REDIS_URL` y activa los avisos en vivo (WebSockets). En Vercel cada WebSocket queda fijo en una instancia; Redis reparte los eventos entre ellas. Sin Redis todo funciona igual, con consultas cada pocos segundos.
 3. **Variables de entorno** (Settings → Environment Variables):
 
    | Variable | Valor |
@@ -39,14 +39,16 @@ La web y la API se publican juntas en **un solo proyecto de Vercel** con [Vercel
    | `CRON_SECRET` | un valor aleatorio; Vercel Cron lo envía al llamar a `/api/cron/tick` |
    | `VISION_PROVIDER` + clave | opcional: `gemini`, `groq` u `openrouter` con su API key gratuita |
 
-4. **Despliega.** Si el build del servicio Go falla por la versión, revisa que Vercel soporte la del `go.mod` (Go 1.26).
+4. **Despliega.** Si el build nativo de Go fallara (por ejemplo, por la versión 1.26 del `go.mod`), el servicio `api` puede publicarse como contenedor con el `backend/Dockerfile` existente: en `vercel.json`, cambia `"framework": "go"` por `"runtime": "container"`.
 
 En modo serverless no hay procesos corriendo entre visitas, así que:
 
 - la carta (y la lectura opcional con IA) se procesa durante la misma subida;
 - las paradas con hora se completan al consultar el trayecto (la vista del niño consulta cada minuto, además del WebSocket);
 - un **Vercel Cron diario** (`crons` en `vercel.json`) también avanza paradas y borra las fotos vencidas;
-- las conexiones WebSocket se cortan al llegar a la duración máxima de la función (5 minutos en Hobby) y el navegador se reconecta solo.
+- **con Redis**, los WebSockets avisan al instante (la carta leída, la parada completada) aunque el cambio ocurra en otra instancia; se cortan a la duración máxima de la función (5 minutos en Hobby) y el navegador se reconecta solo;
+- **sin Redis**, un WebSocket no recibiría los avisos de otras instancias, así que el backend lo cierra con el código 4410 (el navegador no reintenta);
+- en ambos casos la web también consulta: el estado de la carta cada 3 s mientras el Viejito la lee y el seguimiento del niño cada 15 s, celebrando las paradas recién completadas.
 
 ## Desarrollo local (sin Docker)
 
@@ -75,7 +77,7 @@ Si el backend corre en otro puerto, crea `frontend/.env.local` con `API_TARGET=h
 |---|---|
 | `cd backend && go test ./...` | auth (argon2id compatible con el backend anterior, JWT, rotación de refresh), CSRF, CORS, rate limit y `X-Forwarded-For`, permisos entre cuentas, cartas escritas y con foto, IA de visión simulada (con y sin consentimiento, dibujo sin texto, proveedor caído), EXIF/GPS, retención, trayecto y auto-avance, WebSockets |
 | `cd backend && go test -race ./...` | lo mismo con el detector de carreras (requiere cgo) |
-| `TEST_DATABASE_URL=postgres://… TEST_REDIS_URL=redis://… go test ./...` | la misma batería contra PostgreSQL y Redis, más una prueba con dos instancias que comparten eventos por Redis (el caso de Vercel) |
+| `TEST_DATABASE_URL=postgres://… TEST_REDIS_URL=redis://… go test ./...` | la misma batería contra PostgreSQL y Redis, más una prueba con dos instancias en modo Vercel que comparten eventos por Redis |
 | `cd backend && go vet ./...` | análisis estático |
 | `cd frontend && npm test` | 45 tests de Vitest y Testing Library: stores, luces, tiempos, formulario de carta, interruptor accesible, geometría del Viejito, cinta mágica y entrega de la carta |
 | `cd frontend && npm run lint && npm run typecheck` | ESLint (con jsx-a11y) y TypeScript strict |
@@ -139,7 +141,7 @@ backend/            Go, un solo binario estático
 
 Cuando el brief era ambiguo, elegimos la opción más tierna, accesible y segura para niños:
 
-- **Backend en Go, sin OCR.** El backend Python con EasyOCR/TrOCR pesaba unos 3 GB y necesitaba PostgreSQL, Redis y un worker. El de Go es un binario de unos 25 MB: con SQLite en local y Docker, y con PostgreSQL (Neon) y Redis en Vercel.
+- **Backend en Go, sin OCR.** El backend Python con EasyOCR/TrOCR pesaba unos 3 GB y necesitaba PostgreSQL, Redis y un worker. El de Go es un binario de unos 25 MB: con SQLite en local y Docker, y con PostgreSQL (Neon) y Redis opcional en Vercel.
 - **Fotos dentro de la base.** Así son privadas (solo se sirven al dueño), se borran en cascada con la carta y no hace falta un almacenamiento aparte. Mantiene las mismas rutas, campos JSON, cookies y eventos, así que el frontend casi no cambió, y verifica las contraseñas argon2 del backend anterior.
 - **Enviar una carta requiere la sesión del adulto.** El niño puede escribir, pero la carta solo se guarda en una cuenta familiar. Para curiosear sin cuenta está el botón *Ver cómo viaja una carta*, que reproduce la cinemática sin guardar nada.
 - **La vista del niño es un enlace con código no adivinable** (`/seguimiento/<código>`) y de solo lectura. Muestra apodo, avatar y paradas; nunca cartas ni datos del adulto.

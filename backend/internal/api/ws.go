@@ -30,8 +30,20 @@ func (s *Server) originOK(r *http.Request) bool {
 	return origin == "" || slices.Contains(s.cfg.CORSOrigins, origin)
 }
 
+// closeServerless: en Vercel sin Redis cada WebSocket quedaría en una instancia distinta
+// y no recibiría los eventos de las demás. Se cierra con un código 44xx (el navegador no
+// reintenta) y la web se actualiza consultando cada pocos segundos.
+const closeServerless websocket.StatusCode = 4410
+
+// noLiveEvents: serverless sin Redis no puede repartir eventos entre instancias.
+func (s *Server) noLiveEvents() bool { return s.cfg.Serverless && s.cfg.RedisURL == "" }
+
 // wsLetters: estados de las cartas del padre (requiere la cookie de sesión).
 func (s *Server) wsLetters(w http.ResponseWriter, r *http.Request) {
+	if s.noLiveEvents() {
+		s.rejectWS(w, r, closeServerless, "usa consultas")
+		return
+	}
 	var userID string
 	if c, err := r.Cookie(accessCookie); err == nil {
 		if claims, err := security.ParseToken(s.cfg.SecretKey, c.Value, "access", s.now()); err == nil {
@@ -47,6 +59,10 @@ func (s *Server) wsLetters(w http.ResponseWriter, r *http.Request) {
 
 // wsTracking: vista pública del niño por código de seguimiento.
 func (s *Server) wsTracking(w http.ResponseWriter, r *http.Request) {
+	if s.noLiveEvents() {
+		s.rejectWS(w, r, closeServerless, "usa consultas")
+		return
+	}
 	code := r.PathValue("code")
 	if !s.originOK(r) {
 		s.rejectWS(w, r, 4403, "origen no permitido")

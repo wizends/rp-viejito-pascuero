@@ -138,3 +138,12 @@ export function fromLocalInput(value: string): string | null {
   const offsetMin = m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) : 0;
   return new Date(guess.getTime() - offsetMin * 60_000).toISOString();
 }
+
+/**
+ * Paradas que se completaron desde la consulta anterior (para la celebración cuando
+ * no hay WebSocket). `seen` null = primera carga: no se celebra lo que ya estaba hecho.
+ */
+export function newlyCompleted(seen: ReadonlySet<string> | null, stops: Stop[]): Stop[] {
+  if (!seen) return [];
+  return stops.filter((s) => s.completed_at && !seen.has(s.id));
+}

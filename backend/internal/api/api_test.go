@@ -751,6 +751,17 @@ func TestServerlessModeAndCron(t *testing.T) {
 		t.Fatalf("avance perezoso completó %d", done)
 	}
 
+	// sin WebSockets en Vercel: cierre definitivo 4410 (el navegador consulta)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ws, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(e.http.URL, "http")+"/ws/tracking/"+sh["share_code"].(string), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, rerr := ws.Read(ctx); websocket.CloseStatus(rerr) != 4410 {
+		t.Fatalf("WebSocket en serverless: %v", rerr)
+	}
+
 	// cron: exige el secreto
 	if r := e.client().get("/api/cron/tick"); r.status != 401 {
 		t.Fatalf("cron sin secreto: %d", r.status)
@@ -770,7 +781,8 @@ func TestEventsCrossInstancesViaRedis(t *testing.T) {
 	if pg == "" || ru == "" {
 		t.Skip("requiere TEST_DATABASE_URL y TEST_REDIS_URL")
 	}
-	a := newEnv(t) // instancia A (limpia la base y usa Redis)
+	// instancia A en modo Vercel con Redis: los WebSockets sí se aceptan
+	a := newEnv(t, func(c *config.Config) { c.Serverless = true; c.RedisURL = ru })
 	stB, err := store.Open(pg)
 	if err != nil {
 		t.Fatal(err)

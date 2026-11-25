@@ -23,6 +23,7 @@ type Config struct {
 	// RedisURL reparte los eventos en vivo entre instancias (Vercel); vacío = en memoria.
 	RedisURL string
 	// Serverless (Vercel): sin trabajos de fondo; las cartas se procesan al recibirlas.
+	// Sin RedisURL tampoco hay WebSockets (la web consulta cada pocos segundos).
 	Serverless bool
 	// CronSecret protege /api/cron/tick (Vercel lo envía como "Authorization: Bearer …").
 	CronSecret  string

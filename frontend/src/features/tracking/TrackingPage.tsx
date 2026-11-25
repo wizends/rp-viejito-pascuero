@@ -13,6 +13,7 @@ import { useLights } from '@/stores/lights';
 import { Avatar } from '@/components/ui/Avatar';
 import { FlipClock } from './FlipClock';
 import { Timeline } from './Timeline';
+import { StagePanel } from './StagePanel';
 
 const SleighMap = lazy(() => import('./SleighMap').then((m) => ({ default: m.SleighMap })));
 
@@ -25,6 +26,8 @@ export default function TrackingPage() {
   // consultarse. En Docker el WebSocket además avisa al instante.
   const q = useQuery({ queryKey: key, queryFn: () => api.tracking(code), retry: false, refetchInterval: 15_000 });
   const [celebrate, setCelebrate] = useState<Stop | null>(null);
+  // etapa que se está mirando; null = sigue a la etapa en curso
+  const [picked, setPicked] = useState<number | null>(null);
   const [skew, setSkew] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const reduced = useReducedMotion();
@@ -41,6 +44,7 @@ export default function TrackingPage() {
   const seen = useRef<Set<string> | null>(null);
   const party = (s: Stop) => {
     seen.current?.add(s.id);
+    setPicked(null); // al completarse una parada, se muestra la nueva etapa
     setCelebrate(s);
     if (useLights.getState().audio) playBells();
     setTimeout(() => setCelebrate(null), 4200);
@@ -74,6 +78,8 @@ export default function TrackingPage() {
   const t = q.data;
   const c = countdown(new Date(t.arrival_at).getTime(), now + skew);
   const current = currentStopIndex(t.stops);
+  const live = current === -1 ? t.stops.length - 1 : current;
+  const selected = picked ?? live;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -90,12 +96,23 @@ export default function TrackingPage() {
         <FlipClock c={c} />
       </section>
 
+      {t.stops.length > 0 && <StagePanel stops={t.stops} current={current} selected={selected} onSelect={setPicked} />}
+
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_1.3fr]">
         <section aria-labelledby="paradas">
           <h2 id="paradas" className="mb-4 text-2xl text-marino">
             Paradas
           </h2>
-          {t.stops.length ? <Timeline stops={t.stops} current={current} /> : <p className="font-semibold text-tinta-suave">Los duendes aún están planeando la ruta.</p>}
+          {t.stops.length ? <Timeline
+              stops={t.stops}
+              current={current}
+              selected={selected}
+              onSelect={(i) => {
+                setPicked(i);
+                // en móvil la escena queda arriba: se lleva a la vista para ver la animación
+                document.getElementById('etapa')?.closest('section')?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' });
+              }}
+            /> : <p className="font-semibold text-tinta-suave">Los duendes aún están planeando la ruta.</p>}
         </section>
         <section aria-labelledby="mapa">
           <h2 id="mapa" className="mb-4 text-2xl text-marino">

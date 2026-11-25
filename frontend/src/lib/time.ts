@@ -147,3 +147,64 @@ export function newlyCompleted(seen: ReadonlySet<string> | null, stops: Stop[]):
   if (!seen) return [];
   return stops.filter((s) => s.completed_at && !seen.has(s.id));
 }
+
+/** Punto por donde el trineo "entra" al mapa viniendo del Polo Norte. */
+export const POLO_NORTE: [number, number] = [14, -76];
+
+export interface FlightRoute {
+  /** Polo Norte + paradas con coordenadas */
+  points: [number, number][];
+  /** tramos curvos entre puntos consecutivos */
+  segments: [number, number][][];
+  /** posición actual del trineo sobre la curva */
+  sleigh: { lat: number; lng: number; segment: number; t: number };
+  /** camino ya recorrido (para la estela) */
+  flown: [number, number][];
+  /** ya salió del Polo Norte */
+  departed: boolean;
+}
+
+/**
+ * Ruta del trineo: parte en el Polo Norte y recorre las paradas con coordenadas.
+ * Mientras las etapas del taller (sin coordenadas) no terminen, el trineo espera en
+ * el Polo Norte; después avanza por la curva según la hora de cada parada.
+ */
+export function flightRoute(stops: Stop[], nowMs: number): FlightRoute | null {
+  const firstGeo = stops.findIndex((s) => s.lat !== null && s.lng !== null);
+  if (firstGeo < 0) return null;
+  const geo = stops.filter((s) => s.lat !== null && s.lng !== null);
+  const before = stops.slice(0, firstGeo);
+  const departed = before.every((s) => s.completed_at);
+  const last = before[before.length - 1];
+  // el Polo Norte como parada inicial: "se completa" cuando despegan (fin de la última etapa del taller)
+  const origin = {
+    ...geo[0]!,
+    id: 'polo-norte',
+    lat: POLO_NORTE[0],
+    lng: POLO_NORTE[1],
+    completed_at: departed ? (last?.completed_at ?? geo[0]!.eta ?? new Date(nowMs).toISOString()) : null,
+    eta: last?.eta ?? null,
+  } as Stop;
+  const path = [origin, ...geo];
+  const points = path.map((s) => [s.lat!, s.lng!] as [number, number]);
+  const segments: [number, number][][] = [];
+  for (let i = 0; i < points.length - 1; i++) segments.push(arcPoints(points[i]!, points[i + 1]!, i % 2 ? -0.16 : 0.16));
+
+  const pos = sleighPosition(path, nowMs)!;
+  const seg = segments[pos.segment];
+  let lat = pos.lat;
+  let lng = pos.lng;
+  const flown: [number, number][] = segments.slice(0, pos.segment).flat();
+  if (seg && departed) {
+    // sobre la curva, no en línea recta
+    const x = pos.t * (seg.length - 1);
+    const i = Math.floor(x);
+    const a = seg[i]!;
+    const b = seg[Math.min(i + 1, seg.length - 1)]!;
+    const f = x - i;
+    lat = a[0] + (b[0] - a[0]) * f;
+    lng = a[1] + (b[1] - a[1]) * f;
+    flown.push(...seg.slice(0, i + 1), [lat, lng]);
+  }
+  return { points, segments, sleigh: { lat, lng, segment: pos.segment, t: pos.t }, flown, departed };
+}

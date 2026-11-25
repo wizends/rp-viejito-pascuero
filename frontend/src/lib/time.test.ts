@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countdown, countdownLabel, currentStopIndex, fromLocalInput, newlyCompleted, sleighPosition, toLocalInput } from './time';
+import { POLO_NORTE, countdown, countdownLabel, currentStopIndex, flightRoute, fromLocalInput, newlyCompleted, sleighPosition, toLocalInput } from './time';
 import type { Stop } from './types';
 
 const stop = (p: Partial<Stop>): Stop => ({
@@ -65,5 +65,42 @@ describe('paradas recién completadas (sin WebSocket)', () => {
   it('celebra solo las que se completaron desde la consulta anterior', () => {
     const seen = new Set(['a']);
     expect(newlyCompleted(seen, [stop('a', true), stop('b', true), stop('c', false)]).map((s) => s.id)).toEqual(['b']);
+  });
+});
+
+describe('ruta del trineo desde el Polo Norte', () => {
+  const H = 3_600_000;
+  const mk = (id: string, eta: number, geo: [number, number] | null, done = false) =>
+    ({ id, eta: new Date(eta).toISOString(), completed_at: done ? new Date(eta).toISOString() : null, lat: geo?.[0] ?? null, lng: geo?.[1] ?? null }) as Stop;
+  const plan = (doneUpTo: number) => [
+    mk('taller', 0, null, doneUpTo >= 0),
+    mk('renos', 10 * H, null, doneUpTo >= 1),
+    mk('andes', 18 * H, [-27.1, -68.5], doneUpTo >= 2),
+    mk('ciudad', 20 * H, [-33.45, -70.66], doneUpTo >= 3),
+  ];
+
+  it('espera en el Polo Norte mientras el taller trabaja', () => {
+    const r = flightRoute(plan(0), 5 * H)!;
+    expect(r.departed).toBe(false);
+    expect([r.sleigh.lat, r.sleigh.lng]).toEqual(POLO_NORTE);
+    expect(r.points).toHaveLength(3);
+    expect(r.flown).toHaveLength(0);
+  });
+
+  it('vuela por la curva hacia los Andes después de que despegan los renos', () => {
+    const r = flightRoute(plan(1), 14 * H)!;
+    expect(r.departed).toBe(true);
+    expect(r.sleigh.segment).toBe(0);
+    expect(r.sleigh.t).toBeCloseTo(0.5, 2);
+    // entre el Polo Norte y los Andes, y con estela recorrida
+    expect(r.sleigh.lat).toBeLessThan(POLO_NORTE[0]);
+    expect(r.sleigh.lat).toBeGreaterThan(-27.1);
+    expect(r.flown.length).toBeGreaterThan(5);
+  });
+
+  it('llega a la ciudad al completar todo y sin paradas con coordenadas no hay ruta', () => {
+    const r = flightRoute(plan(3), 30 * H)!;
+    expect(r.sleigh.lat).toBeCloseTo(-33.45, 5);
+    expect(flightRoute([mk('x', 0, null)], 0)).toBeNull();
   });
 });

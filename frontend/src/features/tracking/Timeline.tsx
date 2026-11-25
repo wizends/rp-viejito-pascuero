@@ -6,8 +6,21 @@ import type { Stop } from '@/lib/types';
 import { useReducedMotion } from '@/lib/useReducedMotion';
 import { StopGlyph } from '@/components/ui/Icons';
 
-/** Línea de tiempo vertical: la parada actual pulsa en dorado, las completadas llevan sello. */
-export function Timeline({ stops, current }: { stops: Stop[]; current: number }) {
+/**
+ * Línea de tiempo vertical: la parada actual pulsa en dorado, las completadas llevan
+ * sello. Cada parada se puede tocar para ver su animación.
+ */
+export function Timeline({
+  stops,
+  current,
+  selected,
+  onSelect,
+}: {
+  stops: Stop[];
+  current: number;
+  selected?: number;
+  onSelect?: (i: number) => void;
+}) {
   const reduced = useReducedMotion();
   return (
     <ol className="relative space-y-1" aria-label="Paradas del viaje del regalo">
@@ -46,7 +59,16 @@ export function Timeline({ stops, current }: { stops: Stop[]; current: number })
                 </span>
               )}
             </span>
-            <div className={clsx('pt-1', !done && !isCurrent && 'opacity-60')}>
+            <button
+              type="button"
+              onClick={() => onSelect?.(i)}
+              aria-pressed={selected === i}
+              className={clsx(
+                '-mx-2 -my-1 rounded-xl px-2 py-1 pt-2 text-left transition-colors hover:bg-kraft/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-oro',
+                selected === i && 'bg-kraft/40',
+                !done && !isCurrent && 'opacity-60',
+              )}
+            >
               <p className={clsx('font-display text-lg font-extrabold', isCurrent ? 'text-rojo' : 'text-marino')}>
                 {s.nombre}
                 <span className="sr-only">{done ? ' (completada)' : isCurrent ? ' (en curso)' : ' (por venir)'}</span>
@@ -55,7 +77,7 @@ export function Timeline({ stops, current }: { stops: Stop[]; current: number })
               <p className="text-xs font-bold text-tinta-suave">
                 {done ? `Listo: ${formatDateTime(s.completed_at)}` : s.eta ? `Estimado: ${formatDateTime(s.eta)}` : ''}
               </p>
-            </div>
+            </button>
           </motion.li>
         );
       })}

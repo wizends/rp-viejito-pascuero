@@ -183,9 +183,11 @@
   }
 }
 
-/* Leaflet: mar de día */
+/* Leaflet: mar de mapa de cuento, en la paleta del libro */
 .leaflet-container.leaflet-container {
-  background: linear-gradient(180deg, #7fd3ea 0%, #4fbfdc 100%);
+  background:
+    radial-gradient(circle at 28% 18%, rgb(255 255 255 / 0.4), transparent 45%),
+    linear-gradient(180deg, #bcd3d1 0%, #a3c2c3 100%);
   font-family: Nunito, system-ui, sans-serif;
 }
 .leaflet-tile-pane {
@@ -198,11 +200,9 @@
 .leaflet-control-attribution a {
   color: var(--turquesa-oscuro) !important;
 }
+/* estela del trineo: brillo dorado sobre el camino recorrido */
 .estela-estrellas {
-  filter: drop-shadow(0 2px 0 rgb(74 46 30 / 0.25));
-  stroke-dasharray: 1 9;
-  stroke-linecap: round;
-  stroke-width: 6px;
+  filter: drop-shadow(0 0 4px rgb(217 164 65 / 0.9));
 }
 .trineo-marker {
   transition: transform 1s linear;

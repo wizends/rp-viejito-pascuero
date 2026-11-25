@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     rate_limit_ip: int = 120
     rate_limit_auth: int = 10
     rate_limit_uploads: int = 12
+    # Detrás de un proxy propio (p. ej. el frontend en Vercel reenvía /api): toma la IP
+    # del cliente de X-Forwarded-For. Solo activarlo si el backend no es accesible directo,
+    # porque un cliente podría falsificar esa cabecera.
+    trust_forwarded_for: bool = False
 
     # Archivos
     upload_dir: Path = BASE_DIR / "data" / "uploads"

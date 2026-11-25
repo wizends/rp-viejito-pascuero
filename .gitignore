@@ -22,3 +22,6 @@ frontend/.env.local
 # Herramientas locales de Claude Code (skills de terceros, ajustes personales)
 .claude/skills/
 .claude/settings.local.json
+
+# Salida de build de Vercel
+.vercel/

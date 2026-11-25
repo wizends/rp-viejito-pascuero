@@ -63,6 +63,11 @@ def reset_limits() -> None:
 
 
 def client_ip(request: Request) -> str:
+    if get_settings().trust_forwarded_for:
+        # el proxy agrega la IP real al principio de la cadena
+        fwd = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        if fwd:
+            return fwd
     return request.client.host if request.client else "desconocido"
 
 

@@ -34,7 +34,37 @@ export function SessionBootstrap() {
     }
     if (msg.event === 'shipment.updated') void qc.invalidateQueries({ queryKey: ['shipment'] });
   });
+  usePollLetterStatus();
   return null;
+}
+
+const FINAL: ReadonlySet<string> = new Set(['leida', 'necesita_ayuda']);
+
+/**
+ * Respaldo del WebSocket: mientras la escena espera la lectura de una carta,
+ * consulta su estado cada 3 s. Cubre despliegues donde el WebSocket no llega
+ * (p. ej. Vercel con el backend en otro dominio) o se cortó la conexión.
+ */
+function usePollLetterStatus() {
+  const letterId = useScene((s) => s.letterId);
+  const waiting = useScene((s) => s.phase !== 'idle' && !FINAL.has(s.backendStatus ?? ''));
+  useEffect(() => {
+    if (!letterId || !waiting) return;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const l = await api.letter(letterId);
+        if (alive) useScene.getState().setBackendStatus(letterId, l.status);
+      } catch {
+        /* sin red o sin sesión: el próximo intento (o el WebSocket) lo resuelve */
+      }
+    };
+    const id = window.setInterval(() => void tick(), 3000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, [letterId, waiting]);
 }
 
 export function RequireAuth({ children }: { children: ReactNode }) {

@@ -20,6 +20,25 @@ Luego abre **http://localhost:8080**. Docker levanta `frontend` (nginx), `backen
 - La primera build instala EasyOCR y TrOCR (PyTorch CPU, unos 2 GB). Para una imagen liviana que solo use Tesseract: `INSTALL_ML=false docker compose up --build`.
 - Los modelos se descargan la primera vez que se usan y quedan en el volumen `models`.
 
+## Publicar en Vercel
+
+Vercel sirve la web (React/Vite). El backend (FastAPI con OCR, PostgreSQL, Redis y WebSockets) no corre en Vercel: va en un servicio que acepte contenedores (Render, Railway, Fly.io, un VPS…) con `backend/Dockerfile`.
+
+1. **Importa el repo** en Vercel con la carpeta raíz del repositorio (no `frontend/`). `vercel.json` ya define la instalación y el build; no hay que elegir framework.
+2. **Variables de entorno en Vercel** (Settings → Environment Variables):
+
+   | Variable | Ejemplo | Para qué |
+   | --- | --- | --- |
+   | `BACKEND_URL` | `https://api.tudominio.cl` | Vercel reenvía `/api/*` a esta URL (proxy). El navegador ve un solo origen, así las cookies de sesión y el CSRF funcionan igual que en Docker. Sin ella la web queda en **modo vitrina**: la escena 3D y la demo de la carta funcionan, `/api` responde 503. |
+   | `VITE_WS_URL` | `wss://api.tudominio.cl` | Vercel no reenvía WebSockets: el seguimiento en vivo se conecta directo al backend. Se agrega solo a la CSP. |
+   | `VITE_MAP_TILES_URL` | (opcional) | Teselas del mapa del trineo. |
+
+3. **Variables del backend** (donde lo publiques): `ENVIRONMENT=production`, `SECRET_KEY` fuerte, `COOKIE_SECURE=true`, `CORS_ORIGINS=https://tu-proyecto.vercel.app` (también lo usa el WebSocket para validar el origen) y `TRUST_FORWARDED_FOR=true` para que el rate limit vea la IP real de cada visitante y no la de Vercel. Activa esa última solo si el backend no queda expuesto directo a internet sin pasar por Vercel.
+
+Cómo funciona: el build corre `npm run build` en `frontend/` y luego `frontend/scripts/vercel-output.mjs`, que arma `.vercel/output` (Build Output API): rutas de la SPA, las mismas cabeceras de seguridad que `nginx.conf`, caché larga para `/assets` y el proxy de `/api`. Como la cookie de sesión es del dominio de Vercel y no viaja al WebSocket del backend, el estado de una carta recién enviada también se consulta cada 3 s mientras el Viejito la lee (`usePollLetterStatus` en `features/auth/session.tsx`); en Docker el WebSocket sigue siendo la vía principal.
+
+Para revisar la salida en local: `npm run build --prefix frontend && node frontend/scripts/vercel-output.mjs`.
+
 ## Desarrollo local (sin Docker)
 
 **Backend** (Python 3.12 o superior; usa SQLite y `BackgroundTasks`, sin Redis):

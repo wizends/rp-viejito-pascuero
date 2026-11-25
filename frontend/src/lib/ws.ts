@@ -6,6 +6,17 @@ export interface WsMessage<T = unknown> {
 }
 
 /**
+ * Origen de los WebSockets. En Docker es el mismo de la página (nginx hace de
+ * proxy); en Vercel, que no reenvía WebSockets, es el backend (`VITE_WS_URL`).
+ */
+function wsBase(): string {
+  const env = import.meta.env.VITE_WS_URL?.replace(/\/+$/, '');
+  if (env) return env;
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${proto}://${window.location.host}`;
+}
+
+/**
  * WebSocket con reconexión exponencial y ping cada 25 s.
  * `onMessage` se guarda en un ref para no reconectar en cada render.
  */
@@ -22,8 +33,7 @@ export function useSocket(path: string | null, onMessage: (msg: WsMessage) => vo
     let pingTimer: number | undefined;
 
     const connect = () => {
-      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      ws = new WebSocket(`${proto}://${window.location.host}${path}`);
+      ws = new WebSocket(`${wsBase()}${path}`);
       ws.onopen = () => {
         attempt = 0;
         pingTimer = window.setInterval(() => ws?.readyState === 1 && ws.send('ping'), 25_000);

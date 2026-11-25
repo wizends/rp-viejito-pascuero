@@ -98,3 +98,20 @@ def test_rate_limit_auth(monkeypatch) -> None:  # type: ignore[no-untyped-def]
         ]
     assert codes[:3] == [401, 401, 401]
     assert codes[3] == 429
+
+
+def test_ip_real_detras_de_proxy(monkeypatch):
+    """Con TRUST_FORWARDED_FOR la IP sale de X-Forwarded-For (proxy de Vercel); sin él, se ignora."""
+    from starlette.requests import Request
+
+    from app.core import ratelimit
+    from app.core.config import get_settings
+
+    def req(fwd: str) -> Request:
+        return Request({"type": "http", "headers": [(b"x-forwarded-for", fwd.encode())], "client": ("76.76.21.1", 1)})
+
+    s = get_settings()
+    monkeypatch.setattr(s, "trust_forwarded_for", False)
+    assert ratelimit.client_ip(req("200.1.2.3, 76.76.21.1")) == "76.76.21.1"
+    monkeypatch.setattr(s, "trust_forwarded_for", True)
+    assert ratelimit.client_ip(req("200.1.2.3, 76.76.21.1")) == "200.1.2.3"

@@ -123,7 +123,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/shipments/{id}/stops/order", s.authed(s.reorderStops))
 	mux.HandleFunc("PATCH /api/stops/{id}", s.authed(s.updateStop))
 	mux.HandleFunc("DELETE /api/stops/{id}", s.authed(s.deleteStop))
+	mux.HandleFunc("PUT /api/shipments/{id}/tree", s.authed(s.putTreePhoto))
+	mux.HandleFunc("GET /api/shipments/{id}/tree", s.authed(s.getTreePhoto))
+	mux.HandleFunc("DELETE /api/shipments/{id}/tree", s.authed(s.deleteTreePhoto))
 	mux.HandleFunc("GET /api/tracking/{code}", s.publicTracking)
+	mux.HandleFunc("GET /api/tracking/{code}/selfie", s.publicSelfie)
 	mux.HandleFunc("GET /api/cron/tick", s.cronTick)
 
 	// tiempo real

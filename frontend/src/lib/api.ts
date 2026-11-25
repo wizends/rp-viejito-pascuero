@@ -78,6 +78,19 @@ export async function request<T>(
   return body as T;
 }
 
+/** Descarga una imagen de la API (con la sesión, si hay). */
+async function image(path: string, retry = true): Promise<Blob> {
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, { credentials: 'same-origin', cache: 'no-store' });
+  } catch {
+    throw new ApiError(0, messageFrom(null, 0));
+  }
+  if (res.status === 401 && retry && (await tryRefresh())) return image(path, false);
+  if (!res.ok) throw new ApiError(res.status, messageFrom(await res.json().catch(() => null), res.status));
+  return res.blob();
+}
+
 export const api = {
   me: () => request<User>('/auth/me'),
   login: (email: string, password: string) =>
@@ -124,6 +137,14 @@ export const api = {
   updateStop: (id: string, patch: Partial<StopInput> & { completed?: boolean }) =>
     request<Shipment>(`/stops/${id}`, { method: 'PATCH', json: patch }),
   deleteStop: (id: string) => request<Shipment>(`/stops/${id}`, { method: 'DELETE' }),
+  treePhoto: (id: string) => image(`/shipments/${id}/tree`),
+  uploadTreePhoto: (id: string, file: Blob) => {
+    const fd = new FormData();
+    fd.set('file', file, 'arbol.jpg');
+    return request<Shipment>(`/shipments/${id}/tree`, { method: 'PUT', body: fd });
+  },
+  deleteTreePhoto: (id: string) => request<Shipment>(`/shipments/${id}/tree`, { method: 'DELETE' }),
 
   tracking: (code: string) => request<Tracking>(`/tracking/${encodeURIComponent(code)}`),
+  selfie: (code: string) => image(`/tracking/${encodeURIComponent(code)}/selfie`),
 };

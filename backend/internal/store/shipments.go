@@ -29,13 +29,16 @@ type Shipment struct {
 	ShareCode string
 	ArrivalAt time.Time
 	CreatedAt time.Time
-	Stops     []Stop
+	// HasTree indica que el padre subió la foto del árbol (para la selfie del Viejito).
+	HasTree bool
+	Stops   []Stop
 }
 
 func scanShipment(row interface{ Scan(...any) error }) (*Shipment, error) {
 	var sh Shipment
 	var arrival, created string
-	if err := row.Scan(&sh.ID, &sh.ChildID, &sh.ShareCode, &arrival, &created); err != nil {
+	var trees int
+	if err := row.Scan(&sh.ID, &sh.ChildID, &sh.ShareCode, &arrival, &created, &trees); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -43,10 +46,12 @@ func scanShipment(row interface{ Scan(...any) error }) (*Shipment, error) {
 	}
 	sh.ArrivalAt = parseTime(arrival)
 	sh.CreatedAt = parseTime(created)
+	sh.HasTree = trees > 0
 	return &sh, nil
 }
 
-const shipCols = `s.id, s.child_id, s.share_code, s.arrival_at, s.created_at`
+const shipCols = `s.id, s.child_id, s.share_code, s.arrival_at, s.created_at,
+	(SELECT COUNT(*) FROM tree_photos t WHERE t.shipment_id = s.id)`
 
 func (s *Store) withStops(ctx context.Context, sh *Shipment, err error) (*Shipment, error) {
 	if err != nil {

@@ -168,15 +168,7 @@ func (s *Server) uploadLetter(w http.ResponseWriter, r *http.Request, u *store.U
 		s.tooMany(w, nil)
 		return
 	}
-	maxBytes := s.cfg.MaxUploadMB << 20
-	r.Body = http.MaxBytesReader(w, r.Body, int64(maxBytes)+1<<20)
-	if err := r.ParseMultipartForm(8 << 20); err != nil {
-		var tooBig *http.MaxBytesError
-		if errors.As(err, &tooBig) {
-			writeErr(w, errf(http.StatusBadRequest, "El archivo supera los %d MB.", s.cfg.MaxUploadMB))
-			return
-		}
-		writeErr(w, invalid("Revisa los datos del formulario."))
+	if !s.parseUpload(w, r) {
 		return
 	}
 	defer r.MultipartForm.RemoveAll()
@@ -190,29 +182,8 @@ func (s *Server) uploadLetter(w http.ResponseWriter, r *http.Request, u *store.U
 		writeErr(w, notFound(err))
 		return
 	}
-	file, _, err := r.FormFile("file")
-	if err != nil {
-		writeErr(w, invalid("Falta la foto de la carta."))
-		return
-	}
-	defer file.Close()
-	data, err := io.ReadAll(io.LimitReader(file, int64(maxBytes)+1))
-	if err != nil {
-		writeErr(w, err)
-		return
-	}
-	clean, err := imaging.Clean(data, maxBytes)
-	if err != nil {
-		var ie *imaging.Error
-		if errors.As(err, &ie) {
-			status := http.StatusBadRequest
-			if ie.Unsupported {
-				status = http.StatusUnsupportedMediaType
-			}
-			writeErr(w, errf(status, "%s", ie.Msg))
-			return
-		}
-		writeErr(w, err)
+	clean, ok := s.uploadedImage(w, r, "Falta la foto de la carta.")
+	if !ok {
 		return
 	}
 	masked, _ := text.MaskPII(mensaje)
@@ -224,6 +195,52 @@ func (s *Server) uploadLetter(w http.ResponseWriter, r *http.Request, u *store.U
 	out := toLetterOut(l)
 	s.enqueue(l.ID)
 	writeJSON(w, http.StatusAccepted, out)
+}
+
+// parseUpload lee un formulario multipart con el límite de tamaño configurado.
+func (s *Server) parseUpload(w http.ResponseWriter, r *http.Request) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, int64(s.cfg.MaxUploadMB<<20)+1<<20)
+	if err := r.ParseMultipartForm(8 << 20); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeErr(w, errf(http.StatusBadRequest, "El archivo supera los %d MB.", s.cfg.MaxUploadMB))
+			return false
+		}
+		writeErr(w, invalid("Revisa los datos del formulario."))
+		return false
+	}
+	return true
+}
+
+// uploadedImage valida el campo "file" y lo re-codifica como JPEG sin metadatos (sin GPS).
+func (s *Server) uploadedImage(w http.ResponseWriter, r *http.Request, missing string) (*imaging.Cleaned, bool) {
+	maxBytes := s.cfg.MaxUploadMB << 20
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		writeErr(w, invalid("%s", missing))
+		return nil, false
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, int64(maxBytes)+1))
+	if err != nil {
+		writeErr(w, err)
+		return nil, false
+	}
+	clean, err := imaging.Clean(data, maxBytes)
+	if err != nil {
+		var ie *imaging.Error
+		if errors.As(err, &ie) {
+			status := http.StatusBadRequest
+			if ie.Unsupported {
+				status = http.StatusUnsupportedMediaType
+			}
+			writeErr(w, errf(status, "%s", ie.Msg))
+			return nil, false
+		}
+		writeErr(w, err)
+		return nil, false
+	}
+	return clean, true
 }
 
 // updateLetter permite al padre transcribir o corregir la carta y sus regalos.

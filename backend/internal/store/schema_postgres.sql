@@ -87,3 +87,11 @@ CREATE TABLE IF NOT EXISTS stops (
 );
 CREATE INDEX IF NOT EXISTS ix_stops_shipment ON stops(shipment_id);
 CREATE INDEX IF NOT EXISTS ix_stops_due ON stops(auto_advance, completed_at, eta);
+
+-- Foto del árbol de Pascua (JPEG limpio, sin EXIF): base de la selfie del Viejito al dejar el regalo.
+CREATE TABLE IF NOT EXISTS tree_photos (
+  shipment_id TEXT PRIMARY KEY REFERENCES shipments(id) ON DELETE CASCADE,
+  content_type TEXT NOT NULL,
+  data BYTEA NOT NULL,
+  created_at TEXT NOT NULL
+);

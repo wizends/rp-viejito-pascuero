@@ -149,6 +149,14 @@ backend/            Go, un solo binario estático
 5. **Transcripción a mano:** el adulto puede escribir el texto y los regalos desde el panel cuando quiera.
 6. **Tiempo real:** cada cambio de estado (`recibida → leyendo → leida`) se emite por WebSocket y la escena 3D reacciona. Si el backend se reinicia, retoma las cartas a medio procesar.
 
+### Selfie del Viejito con el árbol
+
+En *Trayecto del regalo*, el adulto puede subir una foto de su árbol de Pascua. Se limpia igual que las cartas (sin EXIF ni GPS) y se guarda en la tabla `tree_photos`. Cuando se completa la parada **¡Bajo el árbol!** (o la última, si no existe esa), la vista del niño revela la selfie que el Viejito Pascuero "se sacó" al dejar el regalo, y se puede descargar.
+
+- **Rutas:** `PUT`, `GET` y `DELETE /api/shipments/{id}/tree` son del dueño. `GET /api/tracking/{código}/selfie` es público, pero responde 404 hasta la entrega, así que antes ni siquiera revela si hay foto. El seguimiento trae `selfie: true` cuando ya está disponible.
+- **El filtro se aplica en el navegador** (`frontend/src/features/selfie/compose.ts`), sin IA ni servicios externos. Pone al Viejito en la mitad con menos detalle, para no tapar el árbol. Después lo integra a la foto: tinte y exposición tomados de la imagen, luz cálida del lado del árbol, sombra, flash en la cara, desenfoque leve del fondo, tono de Nochebuena, viñeta, grano parejo y un sello con la hora de la entrega. Una misma foto da siempre la misma selfie.
+- La foto del árbol se borra sola según `RETENTION_DAYS`, o cuando el adulto la borra.
+
 ## Decisiones (y por qué)
 
 Cuando el brief era ambiguo, elegimos la opción más tierna, accesible y segura para niños:

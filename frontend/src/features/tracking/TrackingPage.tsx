@@ -14,6 +14,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { FlipClock } from './FlipClock';
 import { Timeline } from './Timeline';
 import { StagePanel } from './StagePanel';
+import { SantaSelfie } from '@/features/selfie/SantaSelfie';
 
 const SleighMap = lazy(() => import('./SleighMap').then((m) => ({ default: m.SleighMap })));
 
@@ -25,6 +26,14 @@ export default function TrackingPage() {
   // Consulta cada 15 s: en Vercel no hay WebSocket y las paradas con hora avanzan al
   // consultarse. En Docker el WebSocket además avisa al instante.
   const q = useQuery({ queryKey: key, queryFn: () => api.tracking(code), retry: false, refetchInterval: 15_000 });
+  // la selfie del Viejito existe recién cuando deja el regalo
+  const selfie = useQuery({
+    queryKey: ['selfie', code],
+    queryFn: () => api.selfie(code),
+    enabled: !!q.data?.selfie,
+    staleTime: Infinity,
+    retry: 1,
+  });
   const [celebrate, setCelebrate] = useState<Stop | null>(null);
   // etapa que se está mirando; null = sigue a la etapa en curso
   const [picked, setPicked] = useState<number | null>(null);
@@ -96,6 +105,16 @@ export default function TrackingPage() {
         <FlipClock c={c} />
       </section>
 
+      {t.selfie && (
+        <section aria-labelledby="selfie" className="mt-6 rounded-galleta bg-noche-700 px-4 py-8 text-center shadow-papel sm:px-8">
+          <h2 id="selfie" className="font-cuento text-4xl text-oro-suave sm:text-5xl">
+            ¡El Viejito Pascuero estuvo aquí!
+          </h2>
+          <p className="mx-auto mt-2 max-w-lg font-bold text-hielo">Antes de seguir su viaje se sacó una selfie con tu árbol. ¡Mira debajo, tu regalo te espera!</p>
+          <SantaSelfie className="mt-6" photo={selfie.data} when={deliveredAt(t.stops)} caption={`Para ${t.nickname}, con cariño`} />
+        </section>
+      )}
+
       {t.stops.length > 0 && <StagePanel stops={t.stops} current={current} selected={selected} onSelect={setPicked} />}
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_1.3fr]">
@@ -144,6 +163,12 @@ export default function TrackingPage() {
       </AnimatePresence>
     </div>
   );
+}
+
+/** Hora en que el Viejito dejó el regalo (parada "bajo el árbol" o la última). */
+function deliveredAt(stops: Stop[]): string | null {
+  const tree = [...stops].reverse().find((s) => s.icono === 'arbol') ?? stops[stops.length - 1];
+  return tree?.completed_at ?? null;
 }
 
 /** Estallido de estrellitas y copos (CSS + Framer Motion). */

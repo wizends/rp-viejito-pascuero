@@ -1,0 +1,41 @@
+/* Marco de foto instantánea para la selfie del Viejito. */
+.selfie-polaroid {
+  background: #fffdf7;
+  padding: 0.75rem 0.75rem 0.9rem;
+  border-radius: 0.6rem;
+  box-shadow:
+    0 2px 0 #e7dcc6,
+    0 22px 40px -18px rgb(30 18 8 / 0.55);
+  transform: rotate(-1.2deg);
+}
+
+/* Se revela como una foto instantánea: de lechosa y borrosa a nítida. */
+.selfie-revela {
+  animation: selfie-revela 2.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes selfie-revela {
+  0% { filter: brightness(1.9) saturate(0) blur(6px); opacity: 0.35; }
+  35% { filter: brightness(1.35) saturate(0.4) blur(2px); opacity: 0.85; }
+  100% { filter: none; opacity: 1; }
+}
+
+/* Destello del flash al aparecer. */
+.selfie-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 70% 40%, #fff 0%, rgb(255 255 255 / 0.85) 30%, rgb(255 255 255 / 0) 75%);
+  pointer-events: none;
+  animation: selfie-flash 0.9s ease-out both;
+}
+@keyframes selfie-flash {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selfie-revela,
+  .selfie-flash {
+    animation: none !important;
+  }
+  .selfie-flash { display: none; }
+}

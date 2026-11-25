@@ -91,6 +91,8 @@ export interface Shipment {
   child_id: string;
   share_code: string;
   arrival_at: string;
+  /** el padre subió la foto del árbol para la selfie del Viejito */
+  has_tree_photo: boolean;
   stops: Stop[];
 }
 
@@ -99,6 +101,8 @@ export interface Tracking {
   avatar: Avatar;
   arrival_at: string;
   server_time: string;
+  /** el regalo llegó y hay selfie del Viejito con el árbol */
+  selfie: boolean;
   stops: Stop[];
 }
 

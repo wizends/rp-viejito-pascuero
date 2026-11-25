@@ -56,7 +56,9 @@ type shipmentOut struct {
 	ChildID   string    `json:"child_id"`
 	ShareCode string    `json:"share_code"`
 	ArrivalAt time.Time `json:"arrival_at"`
-	Stops     []stopOut `json:"stops"`
+	// HasTreePhoto: el padre subió la foto del árbol para la selfie del Viejito.
+	HasTreePhoto bool      `json:"has_tree_photo"`
+	Stops        []stopOut `json:"stops"`
 }
 
 // trackingOut es la vista pública del niño: sin ids internos del padre.
@@ -65,7 +67,9 @@ type trackingOut struct {
 	Avatar     string    `json:"avatar"`
 	ArrivalAt  time.Time `json:"arrival_at"`
 	ServerTime time.Time `json:"server_time"`
-	Stops      []stopOut `json:"stops"`
+	// Selfie: el regalo llegó y hay foto del árbol; se pide en /api/tracking/{code}/selfie.
+	Selfie bool      `json:"selfie"`
+	Stops  []stopOut `json:"stops"`
 }
 
 func toStopOut(st store.Stop) stopOut {
@@ -78,7 +82,7 @@ func toShipmentOut(sh *store.Shipment) shipmentOut {
 	for _, st := range sh.Stops {
 		stops = append(stops, toStopOut(st))
 	}
-	return shipmentOut{ID: sh.ID, ChildID: sh.ChildID, ShareCode: sh.ShareCode, ArrivalAt: sh.ArrivalAt, Stops: stops}
+	return shipmentOut{ID: sh.ID, ChildID: sh.ChildID, ShareCode: sh.ShareCode, ArrivalAt: sh.ArrivalAt, HasTreePhoto: sh.HasTree, Stops: stops}
 }
 
 // defaultArrival es la medianoche entre el 24 y el 25 de diciembre (Nochebuena), hora local.
@@ -98,7 +102,7 @@ func (s *Server) publicView(ctx context.Context, sh *store.Shipment) (*trackingO
 	}
 	out := toShipmentOut(sh)
 	return &trackingOut{Nickname: child.Nickname, Avatar: child.Avatar, ArrivalAt: sh.ArrivalAt,
-		ServerTime: s.now().UTC(), Stops: out.Stops}, nil
+		ServerTime: s.now().UTC(), Selfie: sh.HasTree && s.delivered(sh), Stops: out.Stops}, nil
 }
 
 // broadcast avisa al niño (vista pública) y al padre (panel) que el trayecto cambió.

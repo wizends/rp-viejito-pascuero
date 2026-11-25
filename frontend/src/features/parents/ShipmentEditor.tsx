@@ -28,6 +28,7 @@ import { STOP_ICONS, type Child, type Shipment, type Stop, type StopInput } from
 import { STOP_ICON_LABELS, StopGlyph } from '@/components/ui/Icons';
 import { MagicButton } from '@/components/ui/MagicButton';
 import { toast } from '@/components/ui/Toast';
+import { TreePhotoCard } from './TreePhotoCard';
 
 const coord = (min: number, max: number) =>
   z.union([z.literal(''), z.coerce.number().min(min, 'Fuera de rango').max(max, 'Fuera de rango')]);
@@ -133,6 +134,8 @@ export function ShipmentEditor({ child }: { child: Child }) {
           </div>
         </div>
       </div>
+
+      <TreePhotoCard child={child} shipment={sh} />
 
       {/* Paradas */}
       <div className="papel-kraft rounded-galleta p-4 text-tinta shadow-papel sm:p-6">

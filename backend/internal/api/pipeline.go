@@ -133,6 +133,9 @@ func (s *Server) purgeExpiredImages(ctx context.Context) {
 		slog.Error("retención", "err", err)
 		return
 	}
+	if t, err := s.store.PurgeTreePhotos(ctx, now.AddDate(0, 0, -s.cfg.RetentionDays)); err == nil {
+		n += t
+	}
 	if n > 0 {
 		slog.Info("imágenes vencidas borradas", "cantidad", n)
 	}

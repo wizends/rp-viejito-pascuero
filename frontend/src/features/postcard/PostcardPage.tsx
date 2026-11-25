@@ -12,6 +12,8 @@ import {
   ShieldAlert,
   Trash2,
   Undo2,
+  Copy,
+  RefreshCcw,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -40,6 +42,8 @@ import {
   type Theme,
 } from './render';
 import { STICKERS, STICKER_GROUPS, STICKER_IDS, stickerSvg, type StickerId } from './stickers';
+import { FONTS, STYLES, STYLE_IDS, type Style } from './styles';
+import './fonts.css';
 
 const svgUrl = (id: StickerId) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(stickerSvg(id))}`;
 
@@ -66,7 +70,11 @@ export default function PostcardPage() {
   const key = `postal:${letterId}`;
   const [p, setP] = useState<Postcard | null>(null);
   useEffect(() => {
-    if (letter.data && children.data && !p) setP(readJSON<Postcard | null>(key, null) ?? defaultPostcard(nickname));
+    if (letter.data && children.data && !p) {
+      // las postales guardadas antes de un cambio reciben lo que les falte (p. ej. el estilo)
+      const saved = readJSON<Partial<Postcard> | null>(key, null);
+      setP({ ...defaultPostcard(nickname), ...saved });
+    }
   }, [letter.data, children.data, p, key, nickname]);
   useEffect(() => {
     if (p) writeJSON(key, p);
@@ -149,7 +157,9 @@ export default function PostcardPage() {
     if (!p || !drag.current || drag.current.pointer !== e.pointerId) return;
     const { x, y } = point(e);
     const f = FORMATS[p.format];
-    edit(() => ({ x: clamp((x - drag.current!.dx) / f.w, 0, 1), y: clamp((y - drag.current!.dy) / f.h, 0, 1) }));
+    // se copia ahora: React aplica el cambio después y para entonces el arrastre pudo terminar
+    const { dx, dy } = drag.current;
+    edit(() => ({ x: clamp((x - dx) / f.w, 0, 1), y: clamp((y - dy) / f.h, 0, 1) }));
   };
   const onUp = () => (drag.current = null);
 
@@ -191,39 +201,151 @@ export default function PostcardPage() {
     e.preventDefault();
   };
 
-  const addSticker = (id: StickerId) => {
+  /** Agrega un sticker; `at` es el punto donde se soltó (fracción del lienzo). */
+  const addSticker = (id: StickerId, at?: { x: number; y: number }) => {
     if (!p) return;
     if (p.stickers.length >= MAX_STICKERS) return toast(`Máximo ${MAX_STICKERS} stickers por postal.`, 'error');
     const n = p.stickers.length;
-    const st = { id: `s${Date.now()}`, sticker: id, x: 0.3 + ((n * 0.17) % 0.4), y: 0.3 + ((n * 0.23) % 0.4), size: 0.15, rot: ((n % 5) - 2) * 0.12 };
+    const st = {
+      id: `s${Date.now()}`,
+      sticker: id,
+      x: at?.x ?? 0.3 + ((n * 0.17) % 0.4),
+      y: at?.y ?? 0.3 + ((n * 0.23) % 0.4),
+      size: 0.15,
+      rot: ((n % 5) - 2) * 0.12,
+    };
     update((q) => ({ ...q, stickers: [...q.stickers, st] }));
     setSel({ type: 'sticker', id: st.id });
   };
 
-  const exportPng = async (): Promise<Blob> => {
-    const f = FORMATS[p!.format];
+  // ---------- arrastrar stickers desde la paleta (mouse y dedo) ----------
+  const paletteDrag = useRef<{ id: StickerId; sx: number; sy: number; moved: boolean } | null>(null);
+  const [ghost, setGhost] = useState<{ id: StickerId; x: number; y: number; over: boolean } | null>(null);
+
+  /** Punto de la pantalla → fracción del lienzo, o null si cae afuera. */
+  const onCanvas = (cx: number, cy: number) => {
+    const r = canvasRef.current?.getBoundingClientRect();
+    if (!r || cx < r.left || cx > r.right || cy < r.top || cy > r.bottom) return null;
+    return { x: (cx - r.left) / r.width, y: (cy - r.top) / r.height };
+  };
+  const paletteDown = (id: StickerId) => (e: PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    paletteDrag.current = { id, sx: e.clientX, sy: e.clientY, moved: false };
+  };
+  const paletteMove = (e: PointerEvent<HTMLButtonElement>) => {
+    const d = paletteDrag.current;
+    if (!d) return;
+    if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 6) return;
+    d.moved = true;
+    setGhost({ id: d.id, x: e.clientX, y: e.clientY, over: !!onCanvas(e.clientX, e.clientY) });
+  };
+  const paletteUp = (e: PointerEvent<HTMLButtonElement>) => {
+    const d = paletteDrag.current;
+    paletteDrag.current = null;
+    setGhost(null);
+    if (!d) return;
+    if (!d.moved) return addSticker(d.id); // un toque: lo pone en el lienzo
+    const at = onCanvas(e.clientX, e.clientY);
+    if (at) addSticker(d.id, at);
+  };
+  const paletteCancel = () => {
+    paletteDrag.current = null;
+    setGhost(null);
+  };
+
+  // ---------- imagen final, compartir y empezar de nuevo ----------
+  const renderPng = (q: Postcard): Promise<Blob> => {
+    const f = FORMATS[q.format];
     const cv = document.createElement('canvas');
     cv.width = f.w;
     cv.height = f.h;
-    renderPostcard(cv.getContext('2d')!, p!, { stickers: stickers!, letter: content! });
+    renderPostcard(cv.getContext('2d')!, q, { stickers: stickers!, letter: content! });
     return new Promise((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error('No se pudo crear la imagen.'))), 'image/png'));
   };
+  // la imagen se prepara apenas se deja de editar: así "Compartir" abre al instante
+  // (los navegadores exigen llamar a share() justo después del toque)
+  const [png, setPng] = useState<{ blob: Blob; of: Postcard } | null>(null);
+  useEffect(() => {
+    if (!p || !stickers || !content) return;
+    let alive = true;
+    const t = window.setTimeout(() => {
+      void renderPng(p).then((blob) => alive && setPng({ blob, of: p }), () => undefined);
+    }, 300);
+    return () => {
+      alive = false;
+      window.clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p, stickers, content, fontsReady]);
+  const currentPng = async () => (png && png.of === p ? png.blob : renderPng(p!));
+
+  const fileOf = (b: Blob) => new File([b], 'postal-navidena.png', { type: 'image/png' });
+  const nativeShare = useMemo(
+    () => typeof navigator !== 'undefined' && !!navigator.share && !!navigator.canShare?.({ files: [fileOf(new Blob(['x'], { type: 'image/png' }))] }),
+    [],
+  );
+  const [shareMenu, setShareMenu] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!shareMenu) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !actionsRef.current?.contains(e.target as Node)) setShareMenu(false);
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [shareMenu]);
   const download = async () => {
-    const url = URL.createObjectURL(await exportPng());
+    const url = URL.createObjectURL(await currentPng());
     const a = document.createElement('a');
     a.href = url;
     a.download = 'postal-navidena.png';
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
+    setShareMenu(false);
   };
-  const file = (b: Blob) => new File([b], 'postal-navidena.png', { type: 'image/png' });
-  const canShare = typeof navigator !== 'undefined' && !!navigator.canShare?.({ files: [file(new Blob([], { type: 'image/png' }))] });
-  const share = async () => {
+  const copyImage = async () => {
     try {
-      await navigator.share({ files: [file(await exportPng())], title: 'Postal navideña', text: '¡Mi carta al Viejito Pascuero! 🎄' });
-    } catch (e) {
-      if ((e as Error).name !== 'AbortError') void download();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': currentPng() })]);
+      toast('Imagen copiada. Pégala en Instagram, WhatsApp o Facebook.');
+    } catch {
+      toast('Este navegador no deja copiar imágenes. Usa "Descargar".', 'error');
     }
+    setShareMenu(false);
+  };
+  const share = async () => {
+    if (!nativeShare) return setShareMenu((v) => !v);
+    try {
+      await navigator.share({ files: [fileOf(await currentPng())], title: 'Postal navideña', text: '¡Mi carta al Viejito Pascuero! 🎄' });
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') setShareMenu(true); // no se pudo: se ofrecen las otras formas
+    }
+  };
+
+  // empezar de nuevo sin diálogo del navegador (algunos lo bloquean): se puede deshacer
+  const before = useRef<Postcard | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  useEffect(() => {
+    if (!canUndo) return;
+    const t = window.setTimeout(() => setCanUndo(false), 8000);
+    return () => window.clearTimeout(t);
+  }, [canUndo]);
+  const reset = () => {
+    if (!p) return;
+    before.current = p;
+    setSel(null);
+    setP({ ...defaultPostcard(nickname), format: p.format });
+    setCanUndo(true);
+  };
+  const undoReset = () => {
+    if (before.current) setP(before.current);
+    before.current = null;
+    setCanUndo(false);
   };
 
   if (letter.isError) return <Problem text="No encontramos esa carta." />;
@@ -232,6 +354,7 @@ export default function PostcardPage() {
 
   const f = FORMATS[p.format];
   const selSticker = sel?.type === 'sticker' ? p.stickers.find((s) => s.id === sel.id) : null;
+  const selName = sel?.type === 'carta' ? 'Carta' : selSticker ? STICKERS[selSticker.sticker].label : null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -242,8 +365,9 @@ export default function PostcardPage() {
       <p className="mt-1 font-bold text-tinta-suave">Decora la carta{nickname ? ` de ${nickname}` : ''} y compártela en tus redes.</p>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div>
-          <div className="mx-auto" style={{ maxWidth: `min(100%, calc(72vh * ${f.w / f.h}))` }}>
+        {/* el lienzo queda a la vista mientras se baja por las opciones */}
+        <div className="sticky top-0 z-20 -mx-4 self-start bg-[#f3ead8]/95 px-4 pb-2 pt-2 backdrop-blur-sm lg:top-4 lg:mx-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none [--lienzo-h:min(36vh,calc(100vh-260px))] lg:[--lienzo-h:calc(100vh-200px)]">
+          <div className="mx-auto" style={{ maxWidth: `min(100%, calc(var(--lienzo-h) * ${f.w / f.h}))` }}>
             <canvas
               ref={canvasRef}
               width={f.w}
@@ -256,16 +380,17 @@ export default function PostcardPage() {
               onPointerUp={onUp}
               onPointerCancel={onUp}
               onKeyDown={onKey}
-              className="block h-auto w-full cursor-grab touch-none rounded-2xl shadow-papel outline-none ring-oro focus-visible:ring-4 active:cursor-grabbing"
+              className={clsx(
+                'block h-auto w-full cursor-grab touch-none rounded-2xl shadow-papel outline-none ring-oro transition-shadow focus-visible:ring-4 active:cursor-grabbing',
+                ghost?.over && 'ring-4',
+              )}
             />
           </div>
 
-          <div className="mt-3 flex min-h-[44px] flex-wrap items-center justify-center gap-2" aria-live="polite">
-            {sel ? (
+          <div className="mt-2 flex min-h-[44px] flex-wrap items-center justify-center gap-2" aria-live="polite">
+            {sel && selName ? (
               <>
-                <span className="mr-1 text-sm font-extrabold text-tinta-suave">
-                  {sel.type === 'carta' ? 'Carta' : STICKERS[selSticker!.sticker].label}:
-                </span>
+                <span className="mr-1 text-sm font-extrabold text-tinta-suave">{selName}:</span>
                 <Tool label="Más chico" onClick={() => edit((it) => ({ size: it.size / 1.12 }))} icon={<Minus size={16} />} />
                 <Tool label="Más grande" onClick={() => edit((it) => ({ size: it.size * 1.12 }))} icon={<Plus size={16} />} />
                 <Tool label="Girar a la izquierda" onClick={() => edit((it) => ({ rot: it.rot - 0.15 }))} icon={<RotateCcw size={16} />} />
@@ -278,12 +403,48 @@ export default function PostcardPage() {
                 )}
               </>
             ) : (
-              <p className="text-sm font-bold text-tinta-suave">Toca la carta o un sticker para moverlo, agrandarlo o girarlo.</p>
+              <p className="text-center text-xs font-bold text-tinta-suave sm:text-sm">Arrastra stickers al lienzo. Toca uno (o la carta) para moverlo, agrandarlo o girarlo.</p>
             )}
           </div>
+
+          <div ref={actionsRef} className="relative mt-2 flex flex-wrap items-center justify-center gap-2">
+            <MagicButton variant="rojo" icon={<Share2 size={18} aria-hidden="true" />} onClick={() => void share()} aria-expanded={nativeShare ? undefined : shareMenu}>
+              Compartir postal
+            </MagicButton>
+            {canUndo ? (
+              <MagicButton variant="oro" icon={<Undo2 size={16} aria-hidden="true" />} onClick={undoReset}>
+                Deshacer
+              </MagicButton>
+            ) : (
+              <MagicButton variant="crema" icon={<RefreshCcw size={16} aria-hidden="true" />} onClick={reset}>
+                Empezar de nuevo
+              </MagicButton>
+            )}
+            {shareMenu && (
+              <div role="menu" className="absolute bottom-full left-1/2 z-30 mb-2 w-72 -translate-x-1/2 rounded-2xl bg-white p-2 text-tinta shadow-papel ring-1 ring-black/5">
+                <p className="px-2 pb-1 pt-1 text-xs font-bold text-tinta-suave">Este navegador no abre el menú para compartir. Puedes:</p>
+                <button type="button" role="menuitem" onClick={() => void copyImage()} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-extrabold hover:bg-cielo-claro">
+                  <Copy size={16} aria-hidden="true" /> Copiar imagen y pegarla en tu red social
+                </button>
+                <button type="button" role="menuitem" onClick={() => void download()} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-extrabold hover:bg-cielo-claro">
+                  <Download size={16} aria-hidden="true" /> Descargar imagen
+                </button>
+              </div>
+            )}
+          </div>
+          {canUndo && <p className="mt-1 text-center text-xs font-bold text-tinta-suave" role="status">Postal reiniciada. ¿Te arrepentiste? Toca Deshacer.</p>}
         </div>
 
         <aside className="space-y-4">
+          <Panel title="Estilo">
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Estilo gráfico">
+              {STYLE_IDS.map((st) => (
+                <StyleCard key={st} style={st} active={p.style === st} onPick={() => setField('style', st)} />
+              ))}
+            </div>
+            <p className="mt-2 text-xs font-semibold text-tinta-suave">Cambia el fondo, el borde, los stickers y las letras.</p>
+          </Panel>
+
           <Panel title="Formato">
             <Choice<Format> value={p.format} onChange={(v) => setField('format', v)} options={Object.entries(FORMATS).map(([k, v]) => [k as Format, v.label, v.hint])} />
           </Panel>
@@ -364,10 +525,15 @@ export default function PostcardPage() {
                     <button
                       key={id}
                       type="button"
-                      onClick={() => addSticker(id)}
+                      onPointerDown={paletteDown(id)}
+                      onPointerMove={paletteMove}
+                      onPointerUp={paletteUp}
+                      onPointerCancel={paletteCancel}
+                      // con teclado (Enter/espacio) no hay arrastre: se agrega al centro
+                      onClick={(e) => e.detail === 0 && addSticker(id)}
                       aria-label={`Agregar ${STICKERS[id].label}`}
                       title={STICKERS[id].label}
-                      className="grid aspect-square place-items-center rounded-xl bg-noche-700 p-1.5 transition-transform duration-200 ease-rebote hover:scale-110"
+                      className="grid aspect-square cursor-grab touch-none select-none place-items-center rounded-xl bg-noche-700 p-1.5 transition-transform duration-200 ease-rebote hover:scale-110 active:cursor-grabbing"
                     >
                       <img src={svgUrl(id)} alt="" className="h-full w-full" draggable={false} />
                     </button>
@@ -382,27 +548,58 @@ export default function PostcardPage() {
             Antes de publicar, revisa que en la carta no se vean nombres completos, la dirección, el colegio ni la cara de tu hijo o hija.
           </p>
 
-          <div className="flex flex-wrap gap-2">
-            {canShare && (
-              <MagicButton variant="rojo" icon={<Share2 size={16} aria-hidden="true" />} onClick={() => void share()}>
-                Compartir
-              </MagicButton>
-            )}
-            <MagicButton variant={canShare ? 'crema' : 'rojo'} icon={<Download size={16} aria-hidden="true" />} onClick={() => void download()}>
-              Descargar imagen
-            </MagicButton>
-            <MagicButton
-              size="sm"
-              variant="fantasma"
-              icon={<Undo2 size={14} aria-hidden="true" />}
-              onClick={() => window.confirm('¿Empezar la postal de nuevo?') && (setSel(null), setP(defaultPostcard(nickname)))}
-            >
-              Empezar de nuevo
-            </MagicButton>
-          </div>
         </aside>
       </div>
+      {ghost && (
+        <img
+          src={svgUrl(ghost.id)}
+          alt=""
+          aria-hidden="true"
+          className={clsx('pointer-events-none fixed z-50 h-20 w-20 -translate-x-1/2 -translate-y-1/2 drop-shadow-lg transition-transform', ghost.over ? 'scale-110' : 'scale-90 opacity-70')}
+          style={{ left: ghost.x, top: ghost.y }}
+        />
+      )}
     </div>
+  );
+}
+
+const STYLE_SAMPLE: Record<Style, string> = {
+  tradicional: 'linear-gradient(135deg,#24386e,#0d1838)',
+  anime: 'linear-gradient(135deg,#ff8cc0,#7f6bff)',
+  acuarela: 'radial-gradient(circle at 30% 30%,#ffd6e0,#cfe6ff 60%,#fff6e0)',
+  realista: 'radial-gradient(circle at 40% 35%,#6b4a2a,#1b120a)',
+  crayon: 'repeating-linear-gradient(-45deg,#ffe066 0 5px,#ffd23f 5px 8px)',
+};
+const STYLE_INK: Record<Style, { color: string; shadow: string }> = {
+  tradicional: { color: '#ffe6a3', shadow: '0 2px 4px rgb(0 0 0 / .5)' },
+  anime: { color: '#fff', shadow: '-2px 0 #2b1d3a, 2px 0 #2b1d3a, 0 -2px #2b1d3a, 0 3px #2b1d3a' },
+  acuarela: { color: '#c2185b', shadow: '0 0 8px rgb(255 255 255 / .9)' },
+  realista: { color: '#f4d77a', shadow: '0 2px 4px rgb(0 0 0 / .8)' },
+  crayon: { color: '#d6262f', shadow: 'none' },
+};
+
+/** Tarjeta del selector de estilo con una muestra de su letra. */
+function StyleCard({ style, active, onPick }: { style: Style; active: boolean; onPick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={onPick}
+      className={clsx(
+        'overflow-hidden rounded-xl text-left ring-2 transition-transform hover:scale-[1.03]',
+        active ? 'ring-oro ring-offset-2' : 'ring-black/10',
+        style === 'crayon' && 'col-span-2',
+      )}
+    >
+      <span className="grid h-12 place-items-center" style={{ background: STYLE_SAMPLE[style] }}>
+        <span style={{ font: FONTS[style].title(24), color: STYLE_INK[style].color, textShadow: STYLE_INK[style].shadow }}>Navidad</span>
+      </span>
+      <span className="block bg-white px-2 py-1.5">
+        <span className="block text-sm font-extrabold text-tinta">{STYLES[style].label}</span>
+        <span className="block text-[11px] font-semibold leading-tight text-tinta-suave">{STYLES[style].hint}</span>
+      </span>
+    </button>
   );
 }
 

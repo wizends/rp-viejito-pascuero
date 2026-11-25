@@ -73,7 +73,7 @@ export default function TrackingPage() {
       const s = msg.data as Stop;
       if (!seen.current?.has(s.id)) party(s);
     }
-  });
+  }, { public: true });
 
   if (q.isLoading) return <p className="p-10 text-center font-bold text-marino">Buscando el trineo…</p>;
   if (q.isError || !q.data)

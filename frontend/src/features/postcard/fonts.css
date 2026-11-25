@@ -1,0 +1,6 @@
+/* Tipografías de los estilos de la postal (solo latín, se cargan con esta página). */
+@import '@fontsource/fredoka/latin-700.css';
+@import '@fontsource/dancing-script/latin-700.css';
+@import '@fontsource/playfair-display/latin-700.css';
+@import '@fontsource/playfair-display/latin-700-italic.css';
+@import '@fontsource/gochi-hand/latin-400.css';

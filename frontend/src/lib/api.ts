@@ -18,6 +18,11 @@ export class ApiError extends Error {
   }
 }
 
+/** Hay sesión guardada: la cookie CSRF vive lo mismo que la de renovación. */
+export function hasSessionCookie(): boolean {
+  return csrfToken() !== '';
+}
+
 function csrfToken(): string {
   const m = document.cookie.match(/(?:^|;\s*)vp_csrf=([^;]+)/);
   return m?.[1] ? decodeURIComponent(m[1]) : '';
@@ -92,7 +97,15 @@ async function image(path: string, retry = true): Promise<Blob> {
 }
 
 export const api = {
-  me: () => request<User>('/auth/me'),
+  /** Sesión actual; si el acceso venció (15 min) se renueva con la cookie de renovación. */
+  me: async () => {
+    try {
+      return await request<User>('/auth/me');
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401 && (await tryRefresh())) return request<User>('/auth/me', {}, false);
+      throw e;
+    }
+  },
   login: (email: string, password: string) =>
     request<User>('/auth/login', { method: 'POST', json: { email, password } }),
   register: (email: string, password: string, display_name: string) =>

@@ -1,6 +1,7 @@
 import { rng } from '@/features/selfie/compose';
 import { drawFrame, drawThemeBackground } from './decor';
 import { stickerSvg, type StickerId } from './stickers';
+import { FONTS, STYLE_FONT_FACES, drawStyledText, stickerShadow, styleBackground, styleOverlay, styledSticker, type Style } from './styles';
 
 /** Postal navideña dibujada en canvas: la vista previa y la imagen final son la misma. */
 
@@ -72,6 +73,8 @@ export interface LetterPlacement {
 }
 
 export interface Postcard {
+  /** estilo gráfico: cambia fondo, borde, stickers y letras */
+  style: Style;
   format: Format;
   theme: Theme;
   frame: Frame;
@@ -100,6 +103,7 @@ export const MAX_STICKERS = 40;
 
 export function defaultPostcard(nickname = ''): Postcard {
   return {
+    style: 'tradicional',
     format: 'cuadrado',
     theme: 'noche',
     frame: 'luces',
@@ -193,9 +197,7 @@ export function loadStickers(ids: StickerId[]): Promise<Record<StickerId, HTMLIm
 export function loadFonts(): Promise<unknown> {
   if (!document.fonts) return Promise.resolve();
   return Promise.all(
-    ['700 60px "Mountains of Christmas"', '700 40px Caveat', '500 40px Caveat', '800 20px Nunito'].map((f) =>
-      document.fonts.load(f).catch(() => undefined),
-    ),
+    STYLE_FONT_FACES.map((f) => document.fonts.load(f).catch(() => undefined)),
   );
 }
 
@@ -527,41 +529,32 @@ function drawLetter(c: CanvasRenderingContext2D, p: Postcard, content: LetterCon
 
 function drawTexts(c: CanvasRenderingContext2D, p: Postcard, W: number, H: number) {
   const t = THEMES[p.theme];
+  const style = p.style ?? 'tradicional';
+  const fonts = FONTS[style];
+  const look = { color: t.title, halo: t.halo, darkHalo: t.halo === DARK };
+  const r = rng(p.title.length * 31 + p.signature.length + W);
   c.save();
-  c.textAlign = 'center';
-  c.textBaseline = 'middle';
-  c.shadowColor = t.halo;
-  c.shadowBlur = W * 0.012;
-  c.shadowOffsetY = t.halo === DARK ? W * 0.004 : 0;
-  c.strokeStyle = t.halo;
-  c.lineJoin = 'round';
-  // contorno suave + relleno: se lee igual sobre fondos claros, oscuros o con dibujos
-  const write = (s: string, x: number, y: number, width: number) => {
-    c.lineWidth = width;
-    c.strokeText(s, x, y);
-    c.fillText(s, x, y);
-  };
   const tall = p.format === 'historia';
   if (p.title.trim()) {
-    let size = W * 0.078;
-    c.font = `700 ${size}px "Mountains of Christmas", "Baloo 2", Georgia, serif`;
-    let lines = wrapText((s) => c.measureText(s).width, p.title.trim(), W * 0.82);
+    let size = W * 0.078 * fonts.titleK;
+    c.font = fonts.title(size);
+    let lines = wrapText((s) => c.measureText(s).width, p.title.trim(), W * 0.8);
     if (lines.length > 2) {
       size *= 0.8;
-      c.font = `700 ${size}px "Mountains of Christmas", "Baloo 2", Georgia, serif`;
-      lines = wrapText((s) => c.measureText(s).width, p.title.trim(), W * 0.82).slice(0, 3);
+      c.font = fonts.title(size);
+      lines = wrapText((s) => c.measureText(s).width, p.title.trim(), W * 0.8).slice(0, 3);
     }
-    c.fillStyle = t.title;
     const y0 = H * (tall ? 0.1 : 0.115) - ((lines.length - 1) * size) / 2;
-    lines.forEach((ln, i) => write(ln, W / 2, y0 + i * size * 1.02, size * 0.12));
+    lines.forEach((ln, i) => drawStyledText(c, style, 'title', ln, W / 2, y0 + i * size * 1.04, size, look, r));
   }
   if (p.signature.trim()) {
-    c.font = `700 ${W * 0.06}px Caveat, "Comic Sans MS", cursive`;
-    c.fillStyle = t.sign;
-    write(p.signature.trim().slice(0, 60), W / 2, H * (tall ? 0.885 : 0.895), W * 0.008);
+    const size = W * 0.06 * fonts.signK;
+    c.font = fonts.sign(size);
+    drawStyledText(c, style, 'sign', p.signature.trim().slice(0, 60), W / 2, H * (tall ? 0.885 : 0.895), size, { ...look, color: t.sign }, r);
   }
-  c.shadowColor = 'transparent';
   c.globalAlpha = 0.7;
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
   c.font = `800 ${W * 0.019}px Nunito, system-ui, sans-serif`;
   c.fillStyle = p.theme === 'bosque' ? '#2f6b4a' : t.sign;
   c.fillText('Buzón del Viejito Pascuero', W / 2, H - W * 0.062);
@@ -579,22 +572,44 @@ export interface RenderAssets {
 export function renderPostcard(c: CanvasRenderingContext2D, p: Postcard, a: RenderAssets, sel: Selection = null): Box {
   const { w: W, h: H } = FORMATS[p.format];
   c.clearRect(0, 0, W, H);
-  c.drawImage(layer(`bg|${p.theme}|${W}x${H}`, W, H, (x) => drawBackground(x, p.theme, W, H)), 0, 0);
+  const style = p.style ?? 'tradicional';
+  c.drawImage(
+    layer(`bg|${style}|${p.theme}|${W}x${H}`, W, H, (x) => {
+      drawBackground(x, p.theme, W, H);
+      styleBackground(x.canvas, style, rng(W * 7 + H));
+    }),
+    0,
+    0,
+  );
   const letter = drawLetter(c, p, a.letter, W, H);
-  drawTexts(c, p, W, H);
-  c.drawImage(layer(`ov|${p.frame}|${p.snow}|${W}x${H}`, W, H, (x) => drawOverlay(x, p, W, H)), 0, 0);
+  c.drawImage(
+    layer(`ov|${style}|${p.frame}|${p.snow}|${W}x${H}`, W, H, (x) => {
+      // el estilo se aplica al borde; la nieve va después, liviana, para no ensuciar la carta
+      drawOverlay(x, { frame: p.frame, snow: false }, W, H);
+      styleOverlay(x.canvas, style, rng(W * 3 + H * 5));
+      drawOverlay(x, { frame: 'ninguno', snow: p.snow }, W, H);
+    }),
+    0,
+    0,
+  );
 
   for (const st of p.stickers) {
     const b = stickerBox(st, W, H);
     c.save();
     c.translate(b.cx, b.cy);
     c.rotate(b.rot);
-    c.shadowColor = 'rgb(0 0 0 / 0.3)';
-    c.shadowBlur = W * 0.01;
-    c.shadowOffsetY = W * 0.005;
-    c.drawImage(a.stickers[st.sticker], -b.w / 2, -b.h / 2, b.w, b.h);
+    const sh = stickerShadow(style, W);
+    c.shadowColor = sh.color;
+    c.shadowBlur = sh.blur;
+    c.shadowOffsetY = sh.y;
+    // el sticker estilizado trae margen para su contorno: se agranda para que el dibujo mida lo mismo
+    const { image, pad } = styledSticker(a.stickers[st.sticker], st.sticker, style, rng(st.sticker.length * 101));
+    const k = 1 / (1 - 2 * pad);
+    c.drawImage(image, (-b.w / 2) * k, (-b.h / 2) * k, b.w * k, b.h * k);
     c.restore();
   }
+  // los textos van al final: encima del borde, la nieve y los stickers, siempre legibles
+  drawTexts(c, p, W, H);
 
   const selBox = sel?.type === 'carta' ? letter : sel?.type === 'sticker' ? p.stickers.find((s) => s.id === sel.id) : null;
   if (selBox) {

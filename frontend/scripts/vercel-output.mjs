@@ -13,6 +13,7 @@
 import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadEnv } from 'vite';
 
 // carpeta frontend/ (la raíz del proyecto en Vercel)
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,7 +30,10 @@ if (backend && !/^https:\/\//.test(backend)) {
   console.error(`BACKEND_URL debe empezar con https:// (recibido: ${backend})`);
   process.exit(1);
 }
-const wsUrl = (process.env.VITE_WS_URL ?? '').trim().replace(/\/+$/, '');
+// la misma VITE_WS_URL que ve Vite (variables del entorno o archivos .env), en forma wss://
+const viteEnv = loadEnv('production', root, 'VITE_');
+const wsUrl = (process.env.VITE_WS_URL || viteEnv.VITE_WS_URL || '').trim().replace(/\/+$/, '').replace(/^http/, 'ws');
+if (!wsUrl) console.warn('Aviso: sin VITE_WS_URL el seguimiento del niño se actualiza por consulta cada 15 s (sin tiempo real).');
 
 const csp = [
   "default-src 'self'",

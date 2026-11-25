@@ -7,6 +7,7 @@ import { useLights } from '@/stores/lights';
 import { useSession } from '@/stores/session';
 import { CssGarland } from '@/components/ui/CssGarland';
 import { PlugSwitch } from '@/components/ui/PlugSwitch';
+import { MusicControl } from '@/components/ui/MusicControl';
 import { Toaster } from '@/components/ui/Toast';
 
 function AudioToggle() {
@@ -96,6 +97,7 @@ export function Layout() {
           <div className="xl:hidden">
             <PlugSwitch compact />
           </div>
+          <MusicControl />
           <AudioToggle />
         </div>
       </header>

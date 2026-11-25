@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, hasSessionCookie } from '@/lib/api';
 import type { LetterStatusEvent } from '@/lib/types';
 import { useSocket } from '@/lib/ws';
 import { useScene } from '@/stores/scene';
@@ -16,12 +16,13 @@ export function SessionBootstrap() {
   const qc = useQueryClient();
   const { data, error, isFetched } = useQuery({
     queryKey: ['me'],
-    queryFn: api.me,
+    // sin cookie de sesión no hay a quién preguntar: se evita un 401 de más en la consola
+    queryFn: () => (hasSessionCookie() ? api.me() : null),
     retry: false,
   });
   useEffect(() => {
     if (data) setUser(data);
-    else if (isFetched && error instanceof ApiError) setUser(null);
+    else if (isFetched && (data === null || error instanceof ApiError)) setUser(null);
   }, [data, error, isFetched, setUser]);
 
   useSocket(user ? '/ws/letters' : null, (msg) => {

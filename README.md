@@ -163,11 +163,32 @@ Cada carta del panel tiene el botón **Crear postal** (`/postal/<id>`). Abre un 
 
 - **Formatos:** cuadrada, de 1080×1080, para el feed, o vertical, de 1080×1920, para historias.
 - **Diseño:** 11 fondos (noche estrellada, papel kraft, rojo regalo, bosque nevado, rosa chicle, lavanda, hielo, champaña, menta, bastón de dulce y arcoíris pastel), 9 bordes (luces, guirnalda, bastón de dulce, dorado, copos de nieve, corazones, encaje, cinta de regalo o sin borde) y nieve opcional. Los textos llevan un contorno suave para leerse sobre cualquier fondo.
+- **Estilos gráficos:** tradicional, anime, acuarela, realista y crayones. Cada estilo transforma el fondo, el borde, los stickers y la tipografía del título y la firma:
+  - **Anime:** colores vivos en tonos planos, rayos de luz, contornos oscuros y letras Fredoka con doble contorno.
+  - **Acuarela:** pigmento que se corre, papel con textura, bordes secos y letras Dancing Script.
+  - **Realista:** luces desenfocadas, viñeta, grano, relieve y sombras, y título dorado en Playfair Display.
+  - **Crayones:** trazos de cera y papel que se asoma, con letras Gochi Hand.
+
+  Los efectos se aplican con canvas sobre las mismas ilustraciones, así que cada fondo, borde o sticker nuevo funciona en todos los estilos.
 - **Textos:** título y firma editables.
 - **Stickers:** 23 ilustraciones propias, en dos grupos: Navidad clásica y Rosado y brillante (corazones, arcoíris, brillitos, reno con corazones, lazo y más). Los stickers y la carta se arrastran, se agrandan y se giran, con el mouse, el dedo o el teclado.
-- **Compartir:** con *Compartir* (la hoja de compartir del celular) o con *Descargar imagen* (PNG).
+- **Compartir:** *Compartir postal* abre al instante el menú de compartir del celular o del computador, porque la imagen se prepara mientras editas. Si el navegador no tiene ese menú, ofrece copiar la imagen para pegarla en la red social, o descargarla en PNG. *Empezar de nuevo* reinicia el diseño (conserva el formato) y se puede deshacer.
 
 Todo se dibuja en un canvas del navegador (`frontend/src/features/postcard/`), así que la vista previa y la imagen final son la misma. No se sube nada nuevo al servidor. El diseño de cada postal queda guardado en el navegador. Antes de publicar, el editor recuerda revisar que en la carta no se vean datos que identifiquen al niño.
+
+### Música navideña
+
+El botón verde con la nota musical, en el encabezado, pone villancicos tocados por el navegador como caja musical, con bajo suave, acordes y cascabeles. Usa WebAudio y no descarga archivos de audio ([`frontend/src/lib/music.ts`](frontend/src/lib/music.ts)).
+
+- **Villancicos:** son solo melodías tradicionales de dominio público:
+  - *Cascabel (Jingle Bells)*: Pierpont, 1857.
+  - *Adornemos el hogar*: tradicional galés.
+  - *Les deseamos feliz Navidad*: tradicional inglés.
+  - *Noche de paz*: Gruber, 1818.
+- **Reproducción:** se encadenan una tras otra. La flecha junto al botón abre la lista, el botón de siguiente y el volumen.
+- **Nunca suena sola:** el navegador exige un toque y es una página para niños. Se recuerdan la canción y el volumen.
+- **En segundo plano:** al cambiar de pestaña se pausa y retoma al volver.
+- **Tests:** comprueban que cada melodía tenga compases completos y un acorde por compás, para atrapar errores al transcribirlas.
 
 ## Decisiones (y por qué)
 

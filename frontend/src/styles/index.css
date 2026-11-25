@@ -359,3 +359,14 @@
     transition: none;
   }
 }
+
+/* barritas del botón de música */
+@keyframes ecualizador {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}

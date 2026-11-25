@@ -18,6 +18,14 @@ type Config struct {
 	Environment string // development | production | test
 	Addr        string
 	DataDir     string
+	// DatabaseURL (postgres://…) usa PostgreSQL; vacío = SQLite en DataDir.
+	DatabaseURL string
+	// RedisURL reparte los eventos en vivo entre instancias (Vercel); vacío = en memoria.
+	RedisURL string
+	// Serverless (Vercel): sin trabajos de fondo; las cartas se procesan al recibirlas.
+	Serverless bool
+	// CronSecret protege /api/cron/tick (Vercel lo envía como "Authorization: Bearer …").
+	CronSecret  string
 	CORSOrigins []string
 
 	SecretKey      string
@@ -51,11 +59,13 @@ type Config struct {
 
 func (c *Config) IsProduction() bool { return c.Environment == "production" }
 
-// UploadDir es donde se guardan las imágenes de las cartas.
-func (c *Config) UploadDir() string { return filepath.Join(c.DataDir, "uploads") }
-
-// DBPath es el archivo SQLite.
-func (c *Config) DBPath() string { return filepath.Join(c.DataDir, "buzon.db") }
+// DBTarget es la URL de PostgreSQL o, si no hay, el archivo SQLite.
+func (c *Config) DBTarget() string {
+	if c.DatabaseURL != "" {
+		return c.DatabaseURL
+	}
+	return filepath.Join(c.DataDir, "buzon.db")
+}
 
 // Load lee .env (si existe) y el entorno. Las variables de entorno reales tienen prioridad.
 func Load() (*Config, error) {
@@ -64,9 +74,14 @@ func Load() (*Config, error) {
 	}
 	port := get("PORT", "8000")
 	c := &Config{
-		Environment:         get("ENVIRONMENT", "development"),
-		Addr:                get("ADDR", ":"+port),
-		DataDir:             get("DATA_DIR", "data"),
+		Environment: get("ENVIRONMENT", "development"),
+		Addr:        get("ADDR", ":"+port),
+		DataDir:     get("DATA_DIR", "data"),
+		// Neon y Redis los inyectan las integraciones de Vercel con distintos nombres
+		DatabaseURL:         first("DATABASE_URL", "POSTGRES_URL"),
+		RedisURL:            first("REDIS_URL", "KV_URL"),
+		Serverless:          getBool("SERVERLESS", get("VERCEL", "") == "1"),
+		CronSecret:          get("CRON_SECRET", ""),
 		CORSOrigins:         splitList(get("CORS_ORIGINS", "http://localhost:5173,http://localhost:5183,http://localhost:8080")),
 		SecretKey:           get("SECRET_KEY", DevSecret),
 		AccessTTL:           time.Duration(getInt("ACCESS_TOKEN_MINUTES", 15)) * time.Minute,
@@ -127,6 +142,16 @@ func get(k, def string) string {
 		return strings.TrimSpace(v)
 	}
 	return def
+}
+
+// first devuelve la primera variable definida y no vacía.
+func first(keys ...string) string {
+	for _, k := range keys {
+		if v := get(k, ""); v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func getInt(k string, def int) int {

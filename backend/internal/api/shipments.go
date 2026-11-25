@@ -138,6 +138,7 @@ func (s *Server) getShipment(w http.ResponseWriter, r *http.Request, u *store.Us
 		writeErr(w, notFound(err))
 		return
 	}
+	s.advanceDueStops(r.Context()) // avance perezoso: no depende de un proceso de fondo
 	sh, err := s.store.ShipmentForChild(r.Context(), child.ID, s.defaultArrival())
 	if err != nil {
 		writeErr(w, err)
@@ -374,6 +375,7 @@ func (s *Server) deleteStop(w http.ResponseWriter, r *http.Request, u *store.Use
 }
 
 func (s *Server) publicTracking(w http.ResponseWriter, r *http.Request) {
+	s.advanceDueStops(r.Context())
 	sh, err := s.store.ShipmentByCode(r.Context(), r.PathValue("code"))
 	if err != nil {
 		writeErr(w, errf(http.StatusNotFound, "Este código de seguimiento no existe."))
@@ -386,6 +388,17 @@ func (s *Server) publicTracking(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, view)
+}
+
+// cronTick lo llama Vercel Cron (o cualquier programador): avance de paradas y retención.
+func (s *Server) cronTick(w http.ResponseWriter, r *http.Request) {
+	if s.cfg.CronSecret != "" && r.Header.Get("Authorization") != "Bearer "+s.cfg.CronSecret {
+		writeErr(w, errf(http.StatusUnauthorized, "No autorizado."))
+		return
+	}
+	n := s.advanceDueStops(r.Context())
+	s.purgeExpiredImages(r.Context())
+	writeJSON(w, http.StatusOK, map[string]int{"paradas_completadas": n})
 }
 
 // advanceDueStops completa las paradas con auto-avance cuya hora ya pasó.

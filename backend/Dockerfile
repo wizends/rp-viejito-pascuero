@@ -4,7 +4,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/buzon ./cmd/buzon \
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/buzon ./cmd/server \
  && mkdir -p /out/data
 
 # distroless/static: sin shell, con certificados raíz (para la IA de visión) y usuario sin privilegios

@@ -3,7 +3,6 @@ package api
 import (
 	"errors"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/wizends/rp-viejito-pascuero/backend/internal/store"
@@ -150,13 +149,9 @@ func (s *Server) deleteChild(w http.ResponseWriter, r *http.Request, u *store.Us
 		writeErr(w, notFound(err))
 		return
 	}
-	paths, err := s.store.DeleteChild(r.Context(), c.ID)
-	if err != nil {
+	if err := s.store.DeleteChild(r.Context(), c.ID); err != nil {
 		writeErr(w, err)
 		return
-	}
-	for _, p := range paths {
-		_ = os.Remove(p)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -36,7 +36,7 @@ func main() {
 		os.Exit(checkHealth(cfg.Addr))
 	}
 
-	st, err := store.Open(cfg.DBPath())
+	st, err := store.Open(cfg.DBTarget())
 	if err != nil {
 		slog.Error("no se pudo abrir la base", "err", err)
 		os.Exit(1)
@@ -56,7 +56,12 @@ func main() {
 		IdleTimeout:       120 * time.Second,
 	}
 	go func() {
-		slog.Info("buzón abierto", "addr", cfg.Addr, "entorno", cfg.Environment, "ia", cfg.VisionProvider)
+		db := "sqlite"
+		if store.IsPostgres(cfg.DBTarget()) {
+			db = "postgres"
+		}
+		slog.Info("buzón abierto", "addr", cfg.Addr, "entorno", cfg.Environment, "ia", cfg.VisionProvider,
+			"base", db, "redis", cfg.RedisURL != "", "serverless", cfg.Serverless)
 		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("servidor", "err", err)
 			stop()

@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"image/jpeg"
 	"io"
@@ -21,6 +22,7 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/wizends/rp-viejito-pascuero/backend/internal/config"
+	"github.com/wizends/rp-viejito-pascuero/backend/internal/hub"
 	"github.com/wizends/rp-viejito-pascuero/backend/internal/store"
 	"github.com/wizends/rp-viejito-pascuero/backend/internal/text"
 	"github.com/wizends/rp-viejito-pascuero/backend/internal/vision"
@@ -71,15 +73,51 @@ func newEnv(t *testing.T, mod ...func(*config.Config)) *env {
 	for _, m := range mod {
 		m(cfg)
 	}
-	st, err := store.Open(filepath.Join(dir, "buzon.db"))
+	// TEST_DATABASE_URL=postgres://… corre la misma batería contra PostgreSQL (como Neon en Vercel)
+	target := filepath.Join(dir, "buzon.db")
+	if pg := os.Getenv("TEST_DATABASE_URL"); pg != "" {
+		resetPostgres(t, pg)
+		target = pg
+	}
+	st, err := store.Open(target)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// TEST_REDIS_URL reparte los eventos por Redis (como en Vercel)
+	var h *hub.Hub
+	if ru := os.Getenv("TEST_REDIS_URL"); ru != "" {
+		if h, err = hub.NewRedis(ru); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { h.Close() })
+	}
 	e := &env{t: t, vision: &fakeVision{}, now: time.Date(2026, 11, 24, 12, 0, 0, 0, time.UTC)}
-	e.srv = New(cfg, st, Options{Vision: e.vision, Inline: true, Now: func() time.Time { return e.now }})
+	e.srv = New(cfg, st, Options{Vision: e.vision, Hub: h, Inline: true, Now: func() time.Time { return e.now }})
 	e.http = httptest.NewServer(e.srv.Handler())
 	t.Cleanup(func() { e.http.Close(); st.Close() })
 	return e
+}
+
+// images cuenta las fotos guardadas en la base.
+func (e *env) images() int {
+	var n int
+	if err := e.srv.store.DB.QueryRow(`SELECT COUNT(*) FROM letter_images`).Scan(&n); err != nil {
+		e.t.Fatal(err)
+	}
+	return n
+}
+
+// resetPostgres deja la base de pruebas vacía.
+func resetPostgres(t *testing.T, url string) {
+	t.Helper()
+	db, err := sql.Open("pgx", url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`DROP SCHEMA public CASCADE; CREATE SCHEMA public;`); err != nil {
+		t.Fatal(err)
+	}
 }
 
 type client struct {
@@ -409,16 +447,15 @@ func TestPhotoLetterKeepsOnlyTheImage(t *testing.T) {
 		t.Fatalf("transcripción: %v", l)
 	}
 
-	// al borrar la carta se borra el archivo
-	files, _ := os.ReadDir(e.srv.cfg.UploadDir())
-	if len(files) != 1 {
-		t.Fatalf("archivos guardados: %d", len(files))
+	// al borrar la carta se borra la foto
+	if n := e.images(); n != 1 {
+		t.Fatalf("fotos guardadas: %d", n)
 	}
 	if r := c.delete("/api/letters/" + id); r.status != 204 {
 		t.Fatalf("borrar: %d", r.status)
 	}
-	if files, _ := os.ReadDir(e.srv.cfg.UploadDir()); len(files) != 0 {
-		t.Fatal("quedó la imagen en disco")
+	if e.images() != 0 {
+		t.Fatal("quedó la foto en la base")
 	}
 }
 
@@ -469,8 +506,8 @@ func TestUploadRejectsBadFiles(t *testing.T) {
 	if r := c.post("/api/letters/upload", upload(map[string]string{"child_id": "otro"}, testJPEG(t))); r.status != 404 {
 		t.Fatalf("niño ajeno: %d", r.status)
 	}
-	if files, _ := os.ReadDir(e.srv.cfg.UploadDir()); len(files) != 0 {
-		t.Fatal("guardó archivos rechazados")
+	if e.images() != 0 {
+		t.Fatal("guardó fotos rechazadas")
 	}
 }
 
@@ -686,5 +723,88 @@ func TestCORSPreflight(t *testing.T) {
 	res.Body.Close()
 	if res.StatusCode != 200 || res.Header.Get("Access-Control-Allow-Origin") != "http://localhost:5173" || res.Header.Get("Access-Control-Allow-Credentials") != "true" {
 		t.Fatalf("preflight: %d %v", res.StatusCode, res.Header)
+	}
+}
+
+func TestServerlessModeAndCron(t *testing.T) {
+	e := newEnv(t, func(c *config.Config) { c.Serverless = true; c.CronSecret = "secreto-cron" })
+	e.srv.inline = false // en Vercel no hay cola: igual debe procesar al recibir
+	c := e.parent("m@ejemplo.cl")
+	kid := c.child("Vale")
+	id := c.post("/api/letters", map[string]any{"child_id": kid, "deseos": []string{"patines"}}).json(t)["id"].(string)
+	if l := c.get("/api/letters/" + id).json(t); l["status"] != "leida" {
+		t.Fatalf("serverless no procesó al recibir: %v", l["status"])
+	}
+
+	// avance perezoso: consultar el trayecto completa las paradas vencidas
+	sh := c.get("/api/children/" + kid + "/shipment").json(t)
+	c.post("/api/shipments/"+sh["id"].(string)+"/stops/templates", nil)
+	e.now = time.Date(2026, 12, 24, 15, 0, 0, 0, time.UTC)
+	view := e.client().get("/api/tracking/" + sh["share_code"].(string)).json(t)
+	done := 0
+	for _, st := range view["stops"].([]any) {
+		if st.(map[string]any)["completed_at"] != nil {
+			done++
+		}
+	}
+	if done != 5 {
+		t.Fatalf("avance perezoso completó %d", done)
+	}
+
+	// cron: exige el secreto
+	if r := e.client().get("/api/cron/tick"); r.status != 401 {
+		t.Fatalf("cron sin secreto: %d", r.status)
+	}
+	req, _ := http.NewRequest("GET", e.http.URL+"/api/cron/tick", nil)
+	req.Header.Set("Authorization", "Bearer secreto-cron")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil || res.StatusCode != 200 {
+		t.Fatalf("cron con secreto: %v %d", err, res.StatusCode)
+	}
+	res.Body.Close()
+}
+
+// Como en Vercel: el WebSocket queda en una instancia y el cambio llega por otra.
+func TestEventsCrossInstancesViaRedis(t *testing.T) {
+	pg, ru := os.Getenv("TEST_DATABASE_URL"), os.Getenv("TEST_REDIS_URL")
+	if pg == "" || ru == "" {
+		t.Skip("requiere TEST_DATABASE_URL y TEST_REDIS_URL")
+	}
+	a := newEnv(t) // instancia A (limpia la base y usa Redis)
+	stB, err := store.Open(pg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hB, _ := hub.NewRedis(ru)
+	srvB := New(a.srv.cfg, stB, Options{Vision: &fakeVision{}, Hub: hB, Inline: true, Now: func() time.Time { return a.now }})
+	httpB := httptest.NewServer(srvB.Handler())
+	t.Cleanup(func() { httpB.Close(); stB.Close(); hB.Close() })
+
+	c := a.parent("n@ejemplo.cl")
+	kid := c.child("Emi")
+	sh := c.get("/api/children/" + kid + "/shipment").json(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(a.http.URL, "http")+"/ws/tracking/"+sh["share_code"].(string), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.CloseNow()
+
+	// el mismo navegador (cookies) habla ahora con la instancia B
+	b := &client{e: &env{t: t, http: httpB}, c: c.c, jar: c.jar}
+	bu, _ := url.Parse(httpB.URL + "/api/auth/x")
+	au, _ := url.Parse(a.http.URL + "/api/auth/x")
+	var cookies []*http.Cookie
+	for _, k := range c.jar.Cookies(au) {
+		cookies = append(cookies, &http.Cookie{Name: k.Name, Value: k.Value, Path: "/"})
+	}
+	b.jar.SetCookies(bu, cookies)
+	if r := b.post("/api/shipments/"+sh["id"].(string)+"/stops", map[string]any{"nombre": "Desde B"}); r.status != 201 {
+		t.Fatalf("parada en B: %d %s", r.status, r.body)
+	}
+	_, msg, err := conn.Read(ctx)
+	if err != nil || !strings.Contains(string(msg), "Desde B") {
+		t.Fatalf("el evento de B no llegó al socket de A: %v %s", err, msg)
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -83,24 +82,14 @@ func (s *Server) letterImage(w http.ResponseWriter, r *http.Request, u *store.Us
 		writeErr(w, notFound(err))
 		return
 	}
-	gone := errf(http.StatusNotFound, "La imagen ya fue borrada por privacidad.")
-	if l.ImagePath == nil {
-		writeErr(w, gone)
+	data, ctype, err := s.store.Image(r.Context(), l.ID)
+	if l.ImagePath == nil || err != nil {
+		writeErr(w, errf(http.StatusNotFound, "La imagen ya fue borrada por privacidad."))
 		return
-	}
-	f, err := os.Open(*l.ImagePath)
-	if err != nil {
-		writeErr(w, gone)
-		return
-	}
-	defer f.Close()
-	ctype := "image/jpeg"
-	if strings.HasSuffix(*l.ImagePath, ".png") {
-		ctype = "image/png"
 	}
 	w.Header().Set("Content-Type", ctype)
 	w.Header().Set("Cache-Control", "private, no-store")
-	_, _ = io.Copy(w, f)
+	_, _ = w.Write(data)
 }
 
 // writeLetter recibe una carta escrita en la web (deseos + mensaje).
@@ -212,7 +201,7 @@ func (s *Server) uploadLetter(w http.ResponseWriter, r *http.Request, u *store.U
 		writeErr(w, err)
 		return
 	}
-	stored, err := imaging.Clean(data, maxBytes, s.cfg.UploadDir())
+	clean, err := imaging.Clean(data, maxBytes)
 	if err != nil {
 		var ie *imaging.Error
 		if errors.As(err, &ie) {
@@ -227,9 +216,8 @@ func (s *Server) uploadLetter(w http.ResponseWriter, r *http.Request, u *store.U
 		return
 	}
 	masked, _ := text.MaskPII(mensaje)
-	l := &store.Letter{ChildID: child.ID, Source: "foto", Mensaje: masked, ImagePath: &stored.Path}
+	l := &store.Letter{ChildID: child.ID, Source: "foto", Mensaje: masked, Image: clean.Data, ImageContentType: "image/jpeg"}
 	if err := s.store.CreateLetter(r.Context(), l); err != nil {
-		_ = os.Remove(stored.Path)
 		writeErr(w, err)
 		return
 	}
@@ -316,9 +304,6 @@ func (s *Server) deleteLetter(w http.ResponseWriter, r *http.Request, u *store.U
 	if err := s.store.DeleteLetter(r.Context(), l.ID); err != nil {
 		writeErr(w, err)
 		return
-	}
-	if l.ImagePath != nil {
-		_ = os.Remove(*l.ImagePath)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

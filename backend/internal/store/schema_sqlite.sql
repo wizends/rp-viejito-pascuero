@@ -39,13 +39,20 @@ CREATE TABLE IF NOT EXISTS letters (
   confianza REAL,
   metodo TEXT,                     -- escrita | ia | manual
   pii_masked INTEGER NOT NULL DEFAULT 0,
-  image_path TEXT,
+  image_path TEXT,                -- clave de la foto en letter_images (NULL = sin foto)
   image_deleted_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_letters_child ON letters(child_id);
 CREATE INDEX IF NOT EXISTS ix_letters_status ON letters(status);
+
+-- La foto de la carta (JPEG limpio) vive en la base: privada y sin disco aparte.
+CREATE TABLE IF NOT EXISTS letter_images (
+  letter_id TEXT PRIMARY KEY REFERENCES letters(id) ON DELETE CASCADE,
+  content_type TEXT NOT NULL,
+  data BLOB NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS gifts (
   id TEXT PRIMARY KEY,

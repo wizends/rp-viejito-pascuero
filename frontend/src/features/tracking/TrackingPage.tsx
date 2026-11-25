@@ -21,7 +21,9 @@ export default function TrackingPage() {
   const { code = '' } = useParams();
   const qc = useQueryClient();
   const key = ['tracking', code];
-  const q = useQuery({ queryKey: key, queryFn: () => api.tracking(code), retry: false });
+  // además del WebSocket, consulta cada minuto: en Vercel las paradas con hora avanzan
+  // al consultarse y así no dependen de un proceso de fondo
+  const q = useQuery({ queryKey: key, queryFn: () => api.tracking(code), retry: false, refetchInterval: 60_000 });
   const [celebrate, setCelebrate] = useState<Stop | null>(null);
   const [skew, setSkew] = useState(0);
   const [now, setNow] = useState(() => Date.now());

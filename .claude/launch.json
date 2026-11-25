@@ -24,7 +24,7 @@
         "golang:alpine",
         "go",
         "run",
-        "./cmd/buzon"
+        "./cmd/server"
       ],
       "port": 8000
     },

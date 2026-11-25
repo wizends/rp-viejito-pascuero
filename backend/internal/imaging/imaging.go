@@ -14,8 +14,6 @@ import (
 	"image/color"
 	"image/jpeg"
 	_ "image/png" // registra el decodificador PNG
-	"os"
-	"path/filepath"
 
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp" // registra el decodificador WebP
@@ -52,14 +50,14 @@ func Sniff(head []byte) string {
 	return ""
 }
 
-// Stored describe la imagen limpia guardada.
-type Stored struct {
-	Path          string
+// Cleaned es la imagen limpia, lista para guardar.
+type Cleaned struct {
+	Data          []byte // JPEG
 	Width, Height int
 }
 
-// Clean valida, endereza, achica y guarda la imagen como JPEG en dir.
-func Clean(data []byte, maxBytes int, dir string) (*Stored, error) {
+// Clean valida, endereza, achica y re-codifica la imagen como JPEG.
+func Clean(data []byte, maxBytes int) (*Cleaned, error) {
 	if len(data) == 0 {
 		return nil, reject("El archivo está vacío.")
 	}
@@ -86,25 +84,12 @@ func Clean(data []byte, maxBytes int, dir string) (*Stored, error) {
 	}
 	img = fit(img, MaxSide)
 
-	if err := os.MkdirAll(dir, 0o750); err != nil {
+	var out bytes.Buffer
+	if err := jpeg.Encode(&out, img, &jpeg.Options{Quality: quality}); err != nil {
 		return nil, err
 	}
 	b := img.Bounds()
-	path := filepath.Join(dir, randomName()+".jpg")
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
-	if err != nil {
-		return nil, err
-	}
-	if err := jpeg.Encode(f, img, &jpeg.Options{Quality: quality}); err != nil {
-		f.Close()
-		os.Remove(path)
-		return nil, err
-	}
-	if err := f.Close(); err != nil {
-		os.Remove(path)
-		return nil, err
-	}
-	return &Stored{Path: path, Width: b.Dx(), Height: b.Dy()}, nil
+	return &Cleaned{Data: out.Bytes(), Width: b.Dx(), Height: b.Dy()}, nil
 }
 
 // fit achica a maxSide (sin agrandar) y aplana la transparencia sobre blanco.

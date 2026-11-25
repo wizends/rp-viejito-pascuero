@@ -36,6 +36,8 @@ type Server struct {
 // Options permite inyectar dependencias en las pruebas.
 type Options struct {
 	Vision vision.Reader
+	// Hub permite inyectar el reparto de eventos (pruebas con Redis).
+	Hub *hub.Hub
 	// Inline procesa cada carta antes de responder (pruebas).
 	Inline bool
 	Now    func() time.Time
@@ -60,10 +62,21 @@ func New(cfg *config.Config, st *store.Store, opt Options) *Server {
 			OpenRouterKey: cfg.OpenRouterAPIKey, OpenRouterModel: cfg.OpenRouterModel,
 		})
 	}
+	h := opt.Hub
+	if h == nil {
+		h = hub.New()
+		if cfg.RedisURL != "" {
+			if rh, err := hub.NewRedis(cfg.RedisURL); err == nil {
+				h = rh
+			} else {
+				slog.Error("REDIS_URL inválida; eventos solo en memoria", "err", err)
+			}
+		}
+	}
 	// hash de relleno para igualar el tiempo de respuesta cuando el email no existe
 	dummy, _ := security.HashPassword("duende-de-relleno-123")
 	return &Server{
-		cfg: cfg, store: st, hub: hub.New(), vision: reader,
+		cfg: cfg, store: st, hub: h, vision: reader,
 		limiter: newLimiter(cfg.RateWindow, now), now: now, loc: loc,
 		jobs: make(chan string, 512), inline: opt.Inline, dummyHash: dummy,
 	}
@@ -111,6 +124,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /api/stops/{id}", s.authed(s.updateStop))
 	mux.HandleFunc("DELETE /api/stops/{id}", s.authed(s.deleteStop))
 	mux.HandleFunc("GET /api/tracking/{code}", s.publicTracking)
+	mux.HandleFunc("GET /api/cron/tick", s.cronTick)
 
 	// tiempo real
 	mux.HandleFunc("GET /ws/letters", s.wsLetters)
@@ -123,7 +137,12 @@ func (s *Server) Handler() http.Handler {
 }
 
 // Start lanza los trabajos de fondo: cola de cartas, auto-avance y retención.
+// En modo serverless (Vercel) no hay nada corriendo entre visitas: las cartas se
+// procesan al recibirlas, las paradas avanzan al consultarse y un cron diario limpia.
 func (s *Server) Start(ctx context.Context) {
+	if s.cfg.Serverless {
+		return
+	}
 	for i := 0; i < 2; i++ {
 		s.wg.Add(1)
 		go func() {
@@ -173,7 +192,7 @@ func (s *Server) every(ctx context.Context, d time.Duration, fn func()) {
 }
 
 func (s *Server) enqueue(id string) {
-	if s.inline {
+	if s.inline || s.cfg.Serverless {
 		s.processLetter(context.Background(), id)
 		return
 	}

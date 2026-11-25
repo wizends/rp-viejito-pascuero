@@ -15,26 +15,38 @@ cp .env.example .env      # en Windows: copy .env.example .env
 docker compose up --build
 ```
 
-Luego abre **http://localhost:8080**. Docker levanta dos servicios: `frontend` (nginx con la web) y `backend` (API en Go, unos 25 MB). La base SQLite y las fotos de las cartas viven en el volumen `datos`.
+Luego abre **http://localhost:8080**. Docker levanta dos servicios: `frontend` (nginx con la web) y `backend` (API en Go, unos 25 MB). La base SQLite, con las fotos de las cartas adentro, vive en el volumen `datos`. Con `DATABASE_URL` y `REDIS_URL` el mismo backend usa PostgreSQL y Redis, como en Vercel.
 
 ## Publicar en Vercel
 
-Vercel sirve la web (React/Vite). El backend en Go necesita un disco persistente (SQLite y fotos) y WebSockets, así que va en un servicio de contenedores con volumen: Fly.io, Railway, Render (plan con disco) o un VPS, usando `backend/Dockerfile`.
+La web y la API se publican juntas en **un solo proyecto de Vercel** con [Vercel Services](https://vercel.com/docs/services) (beta): `vercel.json` en la raíz define el servicio `web` (Vite, carpeta `frontend/`) y el servicio `api` (Go, carpeta `backend/`), y enruta `/api/*` y `/ws/*` a la API y todo lo demás a la web. Mismo dominio: cookies de sesión, CSRF y WebSockets funcionan sin proxy.
 
-1. **Importa el repo** en Vercel y, cuando detecte dos carpetas, elige solo **`frontend`** (Root Directory = `frontend`). `frontend/vercel.json` ya define la instalación y el build.
-2. **Variables de entorno en Vercel** (Settings → Environment Variables):
+1. **Importa el repo** en Vercel con la **raíz del repositorio** como Root Directory (no `frontend/` ni `backend/`): `vercel.json` describe los dos servicios.
+2. **Conecta el almacenamiento** desde la pestaña *Storage* del proyecto:
+   - **Neon** (PostgreSQL): define `DATABASE_URL`. Ahí viven las cuentas, cartas, fotos y trayectos.
+   - **Redis**: define `REDIS_URL`. En Vercel cada WebSocket queda fijo en una instancia; Redis reparte los eventos entre ellas para que el aviso de "carta leída" o de la parada completada llegue a quien lo está mirando.
+3. **Variables de entorno** (Settings → Environment Variables):
 
-   | Variable | Ejemplo | Para qué |
-   | --- | --- | --- |
-   | `BACKEND_URL` | `https://api.tudominio.cl` | Vercel reenvía `/api/*` a esta URL (proxy). El navegador ve un solo origen, así las cookies de sesión y el CSRF funcionan igual que en Docker. Sin ella la web queda en **modo vitrina**: la escena 3D y la demo de la carta funcionan, `/api` responde 503. |
-   | `VITE_WS_URL` | `wss://api.tudominio.cl` | Vercel no reenvía WebSockets: el seguimiento en vivo se conecta directo al backend. Se agrega solo a la CSP. |
-   | `VITE_MAP_TILES_URL` | (opcional) | Teselas del mapa del trineo. |
+   | Variable | Valor |
+   | --- | --- |
+   | `ENVIRONMENT` | `production` |
+   | `SECRET_KEY` | 48+ caracteres aleatorios (`openssl rand -base64 48`) |
+   | `COOKIE_SECURE` | `true` |
+   | `CORS_ORIGINS` | `https://tu-proyecto.vercel.app` (y tu dominio propio, separados por coma); valida el origen de los WebSockets |
+   | `SERVERLESS` | `true` (también se activa solo con `VERCEL=1`) |
+   | `TRUST_FORWARDED_FOR` | `true`, para que el rate limit vea la IP de cada visitante |
+   | `MAX_UPLOAD_MB` | `4` (Vercel acepta hasta 4,5 MB por petición a Go) |
+   | `CRON_SECRET` | un valor aleatorio; Vercel Cron lo envía al llamar a `/api/cron/tick` |
+   | `VISION_PROVIDER` + clave | opcional: `gemini`, `groq` u `openrouter` con su API key gratuita |
 
-3. **Variables del backend** (donde lo publiques): `ENVIRONMENT=production`, `SECRET_KEY` fuerte, `COOKIE_SECURE=true`, `CORS_ORIGINS=https://tu-proyecto.vercel.app` (también lo usa el WebSocket para validar el origen), `DATA_DIR` apuntando al volumen y `TRUST_FORWARDED_FOR=true` para que el rate limit vea la IP real de cada visitante y no la de Vercel. Activa esa última solo si el backend no queda expuesto directo a internet sin pasar por Vercel.
+4. **Despliega.** Si el build del servicio Go falla por la versión, revisa que Vercel soporte la del `go.mod` (Go 1.26).
 
-Cómo funciona: el build (`npm run build:vercel`) compila con Vite y luego corre `frontend/scripts/vercel-output.mjs`, que arma `frontend/.vercel/output` (Build Output API): rutas de la SPA, las mismas cabeceras de seguridad que `nginx.conf`, caché larga para `/assets` y el proxy de `/api`. Como la cookie de sesión es del dominio de Vercel y no viaja al WebSocket del backend, el estado de una carta recién enviada también se consulta cada 3 s mientras el Viejito la lee (`usePollLetterStatus` en `features/auth/session.tsx`); en Docker el WebSocket sigue siendo la vía principal. El navegador recorta y achica la foto a JPEG (lado mayor 2400 px) antes de subirla, así pesa poco al pasar por el proxy.
+En modo serverless no hay procesos corriendo entre visitas, así que:
 
-Para revisar la salida en local: `cd frontend && npm run build:vercel`.
+- la carta (y la lectura opcional con IA) se procesa durante la misma subida;
+- las paradas con hora se completan al consultar el trayecto (la vista del niño consulta cada minuto, además del WebSocket);
+- un **Vercel Cron diario** (`crons` en `vercel.json`) también avanza paradas y borra las fotos vencidas;
+- las conexiones WebSocket se cortan al llegar a la duración máxima de la función (5 minutos en Hobby) y el navegador se reconecta solo.
 
 ## Desarrollo local (sin Docker)
 
@@ -42,10 +54,10 @@ Para revisar la salida en local: `cd frontend && npm run build:vercel`.
 
 ```bash
 cd backend
-go run ./cmd/buzon        # http://localhost:8000 · lee ../.env · datos en backend/data/
+go run ./cmd/server        # http://localhost:8000 · lee ../.env · datos en backend/data/
 ```
 
-Sin Go instalado: `docker run --rm -p 8000:8000 -v "$PWD/backend:/src" -w /src -e DATA_DIR=/src/data golang:alpine go run ./cmd/buzon`.
+Sin Go instalado: `docker run --rm -p 8000:8000 -v "$PWD/backend:/src" -w /src -e DATA_DIR=/src/data golang:alpine go run ./cmd/server`.
 
 **Frontend:**
 
@@ -63,6 +75,7 @@ Si el backend corre en otro puerto, crea `frontend/.env.local` con `API_TARGET=h
 |---|---|
 | `cd backend && go test ./...` | auth (argon2id compatible con el backend anterior, JWT, rotación de refresh), CSRF, CORS, rate limit y `X-Forwarded-For`, permisos entre cuentas, cartas escritas y con foto, IA de visión simulada (con y sin consentimiento, dibujo sin texto, proveedor caído), EXIF/GPS, retención, trayecto y auto-avance, WebSockets |
 | `cd backend && go test -race ./...` | lo mismo con el detector de carreras (requiere cgo) |
+| `TEST_DATABASE_URL=postgres://… TEST_REDIS_URL=redis://… go test ./...` | la misma batería contra PostgreSQL y Redis, más una prueba con dos instancias que comparten eventos por Redis (el caso de Vercel) |
 | `cd backend && go vet ./...` | análisis estático |
 | `cd frontend && npm test` | 45 tests de Vitest y Testing Library: stores, luces, tiempos, formulario de carta, interruptor accesible, geometría del Viejito, cinta mágica y entrega de la carta |
 | `cd frontend && npm run lint && npm run typecheck` | ESLint (con jsx-a11y) y TypeScript strict |
@@ -102,15 +115,15 @@ frontend/src
   features/         letters · auth · parents · tracking
   stores/           Zustand: luces (persistidas), escena (máquina de estados), sesión
 backend/            Go, un solo binario estático
-  cmd/buzon         main: servidor HTTP, apagado ordenado y -healthcheck para Docker
+  cmd/server        main: servidor HTTP, apagado ordenado y -healthcheck para Docker
   internal/api      rutas (net/http), middleware (cabeceras, CORS, rate limit, CSRF), sesión,
                     niños, cartas y su cola de procesamiento, trayecto y auto-avance, WebSockets
-  internal/store    SQLite (modernc.org/sqlite, Go puro) con el esquema embebido
+  internal/store    SQLite (modernc.org/sqlite, Go puro) o PostgreSQL (pgx) con el mismo SQL; fotos en la base
   internal/security argon2id (formato PHC) y JWT HS256
   internal/imaging  tipo real por magic bytes, orientación EXIF, achicado y re-codificación sin metadatos
   internal/vision   IA de visión opcional: Gemini y API tipo OpenAI (Groq, OpenRouter)
   internal/text     datos sensibles, regalos, ortografía y tono
-  internal/hub      reparto de eventos en tiempo real
+  internal/hub      reparto de eventos en tiempo real (en memoria o con Redis pub/sub entre instancias)
 ```
 
 ### Cartas
@@ -126,7 +139,8 @@ backend/            Go, un solo binario estático
 
 Cuando el brief era ambiguo, elegimos la opción más tierna, accesible y segura para niños:
 
-- **Backend en Go, sin OCR.** El backend Python con EasyOCR/TrOCR pesaba unos 3 GB y necesitaba PostgreSQL, Redis y un worker. El de Go es un binario de unos 25 MB con SQLite embebido: arranca en milisegundos y se publica en cualquier servicio con un volumen. Mantiene las mismas rutas, campos JSON, cookies y eventos, así que el frontend casi no cambió, y verifica las contraseñas argon2 del backend anterior.
+- **Backend en Go, sin OCR.** El backend Python con EasyOCR/TrOCR pesaba unos 3 GB y necesitaba PostgreSQL, Redis y un worker. El de Go es un binario de unos 25 MB: con SQLite en local y Docker, y con PostgreSQL (Neon) y Redis en Vercel.
+- **Fotos dentro de la base.** Así son privadas (solo se sirven al dueño), se borran en cascada con la carta y no hace falta un almacenamiento aparte. Mantiene las mismas rutas, campos JSON, cookies y eventos, así que el frontend casi no cambió, y verifica las contraseñas argon2 del backend anterior.
 - **Enviar una carta requiere la sesión del adulto.** El niño puede escribir, pero la carta solo se guarda en una cuenta familiar. Para curiosear sin cuenta está el botón *Ver cómo viaja una carta*, que reproduce la cinemática sin guardar nada.
 - **La vista del niño es un enlace con código no adivinable** (`/seguimiento/<código>`) y de solo lectura. Muestra apodo, avatar y paradas; nunca cartas ni datos del adulto.
 - **Llegada por defecto:** medianoche entre el 24 y el 25 de diciembre, hora de `America/Santiago`. Las fechas se guardan en UTC en texto de ancho fijo (ordenable).

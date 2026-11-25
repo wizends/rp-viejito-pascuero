@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/wizends/rp-viejito-pascuero/backend/internal/store"
@@ -94,7 +93,7 @@ func readWritten(l *store.Letter) bool {
 
 // readWithAI transcribe la foto con el modelo de visión. Si falla, la carta queda solo como imagen.
 func (s *Server) readWithAI(ctx context.Context, l *store.Letter) bool {
-	img, err := os.ReadFile(*l.ImagePath)
+	img, _, err := s.store.Image(ctx, l.ID)
 	if err != nil {
 		return false
 	}
@@ -129,16 +128,12 @@ func (s *Server) purgeExpiredImages(ctx context.Context) {
 		return
 	}
 	now := s.now()
-	expired, err := s.store.ExpiredImages(ctx, now.AddDate(0, 0, -s.cfg.RetentionDays))
+	n, err := s.store.PurgeImages(ctx, now.AddDate(0, 0, -s.cfg.RetentionDays), now)
 	if err != nil {
 		slog.Error("retención", "err", err)
 		return
 	}
-	for id, path := range expired {
-		_ = os.Remove(path)
-		_ = s.store.ClearImage(ctx, id, now)
-	}
-	if len(expired) > 0 {
-		slog.Info("imágenes vencidas borradas", "cantidad", len(expired))
+	if n > 0 {
+		slog.Info("imágenes vencidas borradas", "cantidad", n)
 	}
 }

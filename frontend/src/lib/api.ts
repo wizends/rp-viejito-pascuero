@@ -123,6 +123,7 @@ export const api = {
     patch: { texto_original?: string; texto_normalizado?: string; gifts?: GiftInput[] },
   ) => request<Letter>(`/letters/${id}`, { method: 'PATCH', json: patch }),
   letter: (id: string) => request<Letter>(`/letters/${id}`),
+  letterImage: (id: string) => image(`/letters/${id}/image`),
   deleteLetter: (id: string) => request<void>(`/letters/${id}`, { method: 'DELETE' }),
 
   shipment: (childId: string) => request<Shipment>(`/children/${childId}/shipment`),

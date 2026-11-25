@@ -9,6 +9,7 @@ import { SleighLoader } from '@/components/ui/SleighLoader';
 
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'));
 const PanelPage = lazy(() => import('@/features/parents/PanelPage'));
+const PostcardPage = lazy(() => import('@/features/postcard/PostcardPage'));
 const TrackingPage = lazy(() => import('@/features/tracking/TrackingPage'));
 const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
@@ -47,6 +48,14 @@ export function App() {
                 element={
                   <RequireAuth>
                     <PanelPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="postal/:letterId"
+                element={
+                  <RequireAuth>
+                    <PostcardPage />
                   </RequireAuth>
                 }
               />

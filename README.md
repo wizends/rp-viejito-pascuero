@@ -157,6 +157,18 @@ En *Trayecto del regalo*, el adulto puede subir una foto de su árbol de Pascua.
 - **El filtro se aplica en el navegador** (`frontend/src/features/selfie/compose.ts`), sin IA ni servicios externos. Pone al Viejito en la mitad con menos detalle, para no tapar el árbol. Después lo integra a la foto: tinte y exposición tomados de la imagen, luz cálida del lado del árbol, sombra, flash en la cara, desenfoque leve del fondo, tono de Nochebuena, viñeta, grano parejo y un sello con la hora de la entrega. Una misma foto da siempre la misma selfie.
 - La foto del árbol se borra sola según `RETENTION_DAYS`, o cuando el adulto la borra.
 
+### Postal navideña para redes
+
+Cada carta del panel tiene el botón **Crear postal** (`/postal/<id>`). Abre un editor donde la carta del niño (la foto, o el texto si se escribió en la web) se decora para compartir:
+
+- **Formatos:** cuadrada, de 1080×1080, para el feed, o vertical, de 1080×1920, para historias.
+- **Diseño:** 11 fondos (noche estrellada, papel kraft, rojo regalo, bosque nevado, rosa chicle, lavanda, hielo, champaña, menta, bastón de dulce y arcoíris pastel), 9 bordes (luces, guirnalda, bastón de dulce, dorado, copos de nieve, corazones, encaje, cinta de regalo o sin borde) y nieve opcional. Los textos llevan un contorno suave para leerse sobre cualquier fondo.
+- **Textos:** título y firma editables.
+- **Stickers:** 23 ilustraciones propias, en dos grupos: Navidad clásica y Rosado y brillante (corazones, arcoíris, brillitos, reno con corazones, lazo y más). Los stickers y la carta se arrastran, se agrandan y se giran, con el mouse, el dedo o el teclado.
+- **Compartir:** con *Compartir* (la hoja de compartir del celular) o con *Descargar imagen* (PNG).
+
+Todo se dibuja en un canvas del navegador (`frontend/src/features/postcard/`), así que la vista previa y la imagen final son la misma. No se sube nada nuevo al servidor. El diseño de cada postal queda guardado en el navegador. Antes de publicar, el editor recuerda revisar que en la carta no se vean datos que identifiquen al niño.
+
 ## Decisiones (y por qué)
 
 Cuando el brief era ambiguo, elegimos la opción más tierna, accesible y segura para niños:

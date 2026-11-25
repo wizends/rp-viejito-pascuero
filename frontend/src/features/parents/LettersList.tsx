@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Gift, Lock, Pencil, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
+import { Check, Gift, Image as ImageIcon, Lock, Pencil, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { clsx } from 'clsx';
 import { api } from '@/lib/api';
@@ -81,7 +82,15 @@ function LetterCard({ letter }: { letter: Letter }) {
             <Lock size={12} className="mr-1 inline" aria-hidden="true" />Datos protegidos
           </span>
         )}
-        <div className="ml-auto flex gap-1">
+        <div className="ml-auto flex items-center gap-1">
+          {(letter.has_image || letter.texto_original || letter.texto_normalizado || letter.mensaje) && (
+            <Link
+              to={`/postal/${letter.id}`}
+              className="mr-1 inline-flex items-center gap-1.5 rounded-full bg-oro px-3 py-1 text-xs font-extrabold text-tinta shadow-[0_3px_0_var(--canela)] transition-transform hover:scale-105"
+            >
+              <ImageIcon size={14} aria-hidden="true" /> Crear postal
+            </Link>
+          )}
           <button type="button" onClick={() => setEditing((e) => !e)} className="rounded-full p-2 hover:bg-kraft/40" aria-label="Editar transcripción">
             <Pencil size={16} />
           </button>

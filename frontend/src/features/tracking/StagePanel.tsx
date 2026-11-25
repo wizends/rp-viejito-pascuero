@@ -1,16 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { clsx } from 'clsx';
 import { ChevronLeft, ChevronRight, Locate } from 'lucide-react';
-import { Suspense } from 'react';
-import { SceneBoundary } from '@/components/ui/SceneBoundary';
-import { lazyPage } from '@/lib/lazyPage';
 import { formatDateTime } from '@/lib/time';
 import type { Stop } from '@/lib/types';
 import { useReducedMotion } from '@/lib/useReducedMotion';
 import { StageScene } from './StageScene';
 import { Collapse, lifecycle, pop } from '@/lib/motion';
-
-const Cordillera3D = lazyPage(() => import('./Cordillera3D'));
 
 type StageState = 'hecha' | 'ahora' | 'pronto';
 
@@ -46,9 +41,6 @@ export function StagePanel({
   if (!stop) return null;
   const state = stageState(stops, selected, current);
   const live = current === -1 ? stops.length - 1 : current;
-  const label = `Ilustración animada: ${stop.nombre}`;
-  // Solo la cordillera tiene modelado 3D; las demás etapas siguen con su SVG.
-  const fallback = <StageScene icon={stop.icono} label={label} />;
 
   return (
     <section aria-labelledby="etapa" className="papel-crema mt-6 overflow-hidden rounded-galleta text-tinta shadow-papel">
@@ -63,15 +55,7 @@ export function StagePanel({
               exit={{ opacity: 0 }}
               transition={{ duration: reduced ? 0.15 : 0.45, ease: [0.22, 1, 0.36, 1] }}
             >
-              {stop.icono === 'montana' ? (
-                <Suspense fallback={fallback}>
-                  <SceneBoundary fallback={fallback}>
-                    <Cordillera3D label={label} reduced={reduced} active={state === 'ahora'} />
-                  </SceneBoundary>
-                </Suspense>
-              ) : (
-                fallback
-              )}
+              <StageScene icon={stop.icono} label={`Ilustración animada: ${stop.nombre}`} />
             </motion.div>
           </AnimatePresence>
         </div>

@@ -65,8 +65,12 @@ const routes = [
     ? { src: '^/api/(.*)$', dest: `${backend}/api/$1` }
     : { src: '^/api/(.*)$', status: 503, headers: { 'Cache-Control': 'no-store' } },
   { handle: 'filesystem' },
-  // SPA: cualquier otra ruta la resuelve React Router
-  { src: '^/(.*)$', dest: '/index.html' },
+  // un archivo con hash que ya no existe (quedó de un despliegue anterior) es un 404 de verdad:
+  // si se devolviera index.html, la página que lo pidió fallaría en silencio
+  { src: '^/assets/(.*)$', status: 404, headers: { 'Cache-Control': 'no-store' } },
+  // SPA: cualquier otra ruta la resuelve React Router; index.html nunca se guarda en caché
+  // para que, tras un despliegue, el navegador pida siempre los archivos nuevos
+  { src: '^/(.*)$', dest: '/index.html', headers: { 'Cache-Control': 'no-cache' } },
 ];
 
 rmSync(out, { recursive: true, force: true });

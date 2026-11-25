@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { fadeUp, pop } from '@/lib/motion';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { lazyPage } from '@/lib/lazyPage';
 import { Gift, MailOpen, MapPinned, Sparkles } from 'lucide-react';
 import { useScene } from '@/stores/scene';
 import { useReducedMotion } from '@/lib/useReducedMotion';
@@ -9,7 +10,7 @@ import { SceneBoundary } from '@/components/ui/SceneBoundary';
 import { SCENE_DEBUG } from '@/components/scene/debug';
 import { LetterComposer } from '@/features/letters/LetterComposer';
 
-const Scene = lazy(() => import('@/components/scene/Scene'));
+const Scene = lazyPage(() => import('@/components/scene/Scene'));
 
 function supportsWebGL(): boolean {
   try {

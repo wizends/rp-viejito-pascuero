@@ -13,6 +13,7 @@ import { MusicControl, MusicQuickButton } from '@/components/ui/MusicControl';
 import { MenuSheet } from './MenuSheet';
 import { Toaster } from '@/components/ui/Toast';
 import { SleighLoader } from '@/components/ui/SleighLoader';
+import { RouteErrorBoundary } from '@/components/ui/RouteErrorBoundary';
 import { cascade, fadeUp, lifecycle, pop, springy } from '@/lib/motion';
 
 function AudioToggle() {
@@ -182,9 +183,11 @@ export function Layout() {
             animate={{ opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } }}
             exit={{ opacity: 0, y: -10, transition: { duration: 0.18, ease: [0.4, 0, 1, 1] } }}
           >
-            <Suspense fallback={<PageFallback />}>
-              <FrozenOutlet />
-            </Suspense>
+            <RouteErrorBoundary>
+              <Suspense fallback={<PageFallback />}>
+                <FrozenOutlet />
+              </Suspense>
+            </RouteErrorBoundary>
           </motion.div>
         </AnimatePresence>
       </main>

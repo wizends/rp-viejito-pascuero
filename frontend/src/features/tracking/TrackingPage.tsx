@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Snowflake, Star } from 'lucide-react';
 import { api } from '@/lib/api';
+import { lazyPage } from '@/lib/lazyPage';
 import { countdown, currentStopIndex, newlyCompleted } from '@/lib/time';
 import type { Stop, Tracking } from '@/lib/types';
 import { useSocket } from '@/lib/ws';
@@ -17,7 +18,7 @@ import { StagePanel } from './StagePanel';
 import { Collapse, Swap, cascade, fadeUp, pop } from '@/lib/motion';
 import { SantaSelfie } from '@/features/selfie/SantaSelfie';
 
-const SleighMap = lazy(() => import('./SleighMap').then((m) => ({ default: m.SleighMap })));
+const SleighMap = lazyPage(() => import('./SleighMap').then((m) => ({ default: m.SleighMap })));
 
 /** Vista del niño (solo lectura): cuenta regresiva, timeline y mapa, con push en tiempo real. */
 export default function TrackingPage() {

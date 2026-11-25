@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MotionConfig, motion } from 'framer-motion';
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
+import { lazyPage } from '@/lib/lazyPage';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { ApiError } from '@/lib/api';
 import { Layout } from './Layout';
@@ -8,12 +9,12 @@ import { RequireAuth, SessionBootstrap } from '@/features/auth/session';
 import { LandingPage } from '@/pages/LandingPage';
 import { SleighLoader } from '@/components/ui/SleighLoader';
 
-const LoginPage = lazy(() => import('@/features/auth/LoginPage'));
-const PanelPage = lazy(() => import('@/features/parents/PanelPage'));
-const PostcardPage = lazy(() => import('@/features/postcard/PostcardPage'));
-const TrackingPage = lazy(() => import('@/features/tracking/TrackingPage'));
-const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'));
-const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
+const LoginPage = lazyPage(() => import('@/features/auth/LoginPage'));
+const PanelPage = lazyPage(() => import('@/features/parents/PanelPage'));
+const PostcardPage = lazyPage(() => import('@/features/postcard/PostcardPage'));
+const TrackingPage = lazyPage(() => import('@/features/tracking/TrackingPage'));
+const PrivacyPage = lazyPage(() => import('@/pages/PrivacyPage'));
+const NotFoundPage = lazyPage(() => import('@/pages/NotFoundPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {

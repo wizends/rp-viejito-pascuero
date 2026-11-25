@@ -370,3 +370,28 @@
     transform: scaleY(1);
   }
 }
+
+/* menú del celular: la hoja sube desde abajo (en tablet aparece arriba a la derecha) */
+.menu-hoja[open] {
+  animation: menu-sube 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.menu-hoja[open]::backdrop {
+  animation: menu-fondo 0.25s ease-out;
+}
+@keyframes menu-sube {
+  from {
+    transform: translateY(28px);
+    opacity: 0;
+  }
+}
+@keyframes menu-fondo {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-hoja[open],
+  .menu-hoja[open]::backdrop {
+    animation: none;
+  }
+}

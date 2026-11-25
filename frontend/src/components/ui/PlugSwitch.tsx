@@ -7,7 +7,7 @@ import { LIGHT_MODES, useLights } from '@/stores/lights';
  * Se inclina a la derecha al encender y la ranura se ilumina con ampolletas.
  * Estilos en `styles/index.css` (`.palanca*`).
  */
-export function PlugSwitch({ compact = false }: { compact?: boolean }) {
+export function PlugSwitch({ compact = false, leverOnly = false }: { compact?: boolean; leverOnly?: boolean }) {
   const mode = useLights((s) => s.mode);
   const lastOnMode = useLights((s) => s.lastOnMode);
   const toggle = useLights((s) => s.toggle);
@@ -37,7 +37,7 @@ export function PlugSwitch({ compact = false }: { compact?: boolean }) {
           <span className="palanca-ranura" />
         </span>
       </button>
-      {compact && (
+      {compact && !leverOnly && (
         <button
           type="button"
           onClick={() => {
@@ -51,7 +51,7 @@ export function PlugSwitch({ compact = false }: { compact?: boolean }) {
           <Sparkles size={18} aria-hidden="true" />
         </button>
       )}
-      {!compact && (
+      {!compact && !leverOnly && (
         <div role="radiogroup" aria-label="Modo de las luces" className="flex gap-1">
           {LIGHT_MODES.map((m) => {
             const selected = on ? mode === m.id : lastOnMode === m.id;

@@ -11,6 +11,7 @@ import { useReducedMotion } from '@/lib/useReducedMotion';
 import { Field } from '@/components/ui/Field';
 import { MagicButton } from '@/components/ui/MagicButton';
 import { toast } from '@/components/ui/Toast';
+import { SITE_NAME, usePageSeo } from '@/lib/seo';
 
 const loginSchema = z.object({
   email: z.string().trim().email('Ese correo no parece válido'),
@@ -25,6 +26,13 @@ type Values = z.infer<typeof registerSchema>;
 /** Inicio de sesión / registro con forma de credencial de ayudante del Viejito. */
 export default function LoginPage({ mode }: { mode: 'login' | 'register' }) {
   const isRegister = mode === 'register';
+  usePageSeo({
+    title: `${isRegister ? 'Crear cuenta de ayudante' : 'Entrar al taller'} · ${SITE_NAME}`,
+    description: isRegister
+      ? 'Crea tu cuenta para escribir cartas al Viejito Pascuero y seguir el viaje de los regalos.'
+      : 'Entra a tu panel de ayudantes del Viejito Pascuero para revisar tus cartas y el trayecto.',
+    noindex: true,
+  });
   const reduced = useReducedMotion();
   const setUser = useSession((s) => s.setUser);
   const qc = useQueryClient();

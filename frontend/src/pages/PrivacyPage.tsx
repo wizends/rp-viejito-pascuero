@@ -1,7 +1,15 @@
 import { motion } from 'framer-motion';
 import { fadeUp } from '@/lib/motion';
+import { SITE_NAME, usePageSeo } from '@/lib/seo';
 
 export default function PrivacyPage() {
+  usePageSeo({
+    title: `Cómo cuidamos las cartas · ${SITE_NAME}`,
+    description:
+      'Qué datos pide el Buzón del Viejito Pascuero, quién puede ver las cartas de los niños y cuándo se borran las fotos.',
+    type: 'article',
+  });
+
   return (
     <motion.article initial="hidden" animate="shown" variants={fadeUp} className="papel-crema mx-auto mt-6 max-w-3xl rounded-galleta p-6 text-tinta shadow-papel sm:p-10">
       <h1 className="font-cuento text-4xl text-rojo-baya">Cómo cuidamos las cartas</h1>

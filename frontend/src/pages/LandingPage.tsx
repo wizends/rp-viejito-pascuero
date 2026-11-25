@@ -9,6 +9,7 @@ import { SleighLoader } from '@/components/ui/SleighLoader';
 import { SceneBoundary } from '@/components/ui/SceneBoundary';
 import { SCENE_DEBUG } from '@/components/scene/debug';
 import { LetterComposer } from '@/features/letters/LetterComposer';
+import { SITE_DESCRIPTION, SITE_NAME, usePageSeo } from '@/lib/seo';
 
 const Scene = lazyPage(() => import('@/components/scene/Scene'));
 
@@ -81,6 +82,8 @@ export function LandingPage() {
   const [failed, setFailed] = useState(false);
   const sendLetter = useScene((s) => s.sendLetter);
   const phase = useScene((s) => s.phase);
+
+  usePageSeo({ title: `${SITE_NAME} · Escríbele tu carta`, description: SITE_DESCRIPTION });
 
   return (
     <>

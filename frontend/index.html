@@ -8,19 +8,67 @@
       name="description"
       content="Escríbele tu carta al Viejito Pascuero, mira cómo la leen sus duendes y renos en el Polo Norte y sigue el viaje de tu regalo hasta tu árbol."
     />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="%SITE_URL%/" />
     <meta name="theme-color" content="#0F1B3D" />
+    <meta name="application-name" content="Buzón del Viejito Pascuero" />
+    <meta name="apple-mobile-web-app-title" content="Buzón del Viejito" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Buzón del Viejito Pascuero" />
     <meta property="og:locale" content="es_CL" />
+    <meta property="og:url" content="%SITE_URL%/" />
     <meta property="og:title" content="Buzón del Viejito Pascuero" />
     <meta
       property="og:description"
       content="Una carta, un sobre lacrado y un taller lleno de duendes leyendo. ¡Jo jo jo!"
     />
-    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image" content="%SITE_URL%/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="El Buzón del Viejito Pascuero y su taller en el Polo Norte" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Buzón del Viejito Pascuero" />
+    <meta
+      name="twitter:description"
+      content="Escribe tu carta, mira cómo la leen los duendes y sigue el viaje de tu regalo hasta el árbol."
+    />
+    <meta name="twitter:image" content="%SITE_URL%/og-image.png" />
+    <meta name="twitter:image:alt" content="El Buzón del Viejito Pascuero y su taller en el Polo Norte" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "%SITE_URL%/#website",
+            "url": "%SITE_URL%/",
+            "name": "Buzón del Viejito Pascuero",
+            "description": "Escribe tu carta al Viejito Pascuero y sigue el viaje de tu regalo hasta tu árbol.",
+            "inLanguage": "es-CL",
+            "publisher": { "@id": "%SITE_URL%/#organization" }
+          },
+          {
+            "@type": "Organization",
+            "@id": "%SITE_URL%/#organization",
+            "name": "Buzón del Viejito Pascuero",
+            "url": "%SITE_URL%/",
+            "logo": "%SITE_URL%/favicon.svg"
+          },
+          {
+            "@type": "WebApplication",
+            "name": "Buzón del Viejito Pascuero",
+            "url": "%SITE_URL%/",
+            "applicationCategory": "LifestyleApplication",
+            "operatingSystem": "Web",
+            "inLanguage": "es-CL",
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CLP" }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <noscript>Para escribirle al Viejito Pascuero necesitas activar JavaScript.</noscript>

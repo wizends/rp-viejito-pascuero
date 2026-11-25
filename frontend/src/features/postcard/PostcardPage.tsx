@@ -24,6 +24,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Collapse, Swap, cascade, fade, fadeUp, lifecycle, pop } from '@/lib/motion';
 import { MagicButton } from '@/components/ui/MagicButton';
 import { toast } from '@/components/ui/Toast';
+import { SITE_NAME, usePageSeo } from '@/lib/seo';
 import {
   FORMATS,
   FRAMES,
@@ -378,6 +379,12 @@ export default function PostcardPage() {
     before.current = null;
     setCanUndo(false);
   };
+
+  usePageSeo({
+    title: nickname ? `Postal de ${nickname} · ${SITE_NAME}` : `Postal de tu carta · ${SITE_NAME}`,
+    description: 'Crea y descarga una postal personalizada con la carta de tu familia para el Viejito Pascuero.',
+    noindex: true,
+  });
 
   if (letter.isError) return <Swap id="sin-carta" variants={fadeUp}><Problem text="No encontramos esa carta." /></Swap>;
   if (letter.isLoading || !p || !stickers || (letter.data?.has_image && photo.isLoading))

@@ -11,6 +11,7 @@ import { ChildrenManager } from './ChildrenManager';
 import { LettersList } from './LettersList';
 import { ShipmentEditor } from './ShipmentEditor';
 import { SettingsCard } from './SettingsCard';
+import { SITE_NAME, usePageSeo } from '@/lib/seo';
 
 type Section = 'cartas' | 'trayecto';
 
@@ -19,6 +20,12 @@ export default function PanelPage() {
   const children = useQuery({ queryKey: ['children'], queryFn: api.children });
   const [childId, setChildId] = useState<string | null>(null);
   const [section, setSection] = useState<Section>('cartas');
+
+  usePageSeo({
+    title: `Panel de ayudantes · ${SITE_NAME}`,
+    description: 'Revisa las cartas de tu familia, organiza el trayecto y administra los regalos del Viejito Pascuero.',
+    noindex: true,
+  });
 
   useEffect(() => {
     const list = children.data ?? [];

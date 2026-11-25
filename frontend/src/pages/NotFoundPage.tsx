@@ -1,8 +1,15 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { cascade, fadeUp } from '@/lib/motion';
+import { SITE_NAME, usePageSeo } from '@/lib/seo';
 
 export default function NotFoundPage() {
+  usePageSeo({
+    title: `Esta página se perdió en la nieve · ${SITE_NAME}`,
+    description: 'La página que buscabas no existe. Vuelve al taller del Viejito Pascuero.',
+    noindex: true,
+  });
+
   return (
     <motion.div initial="hidden" animate="shown" variants={cascade(0.09)} className="mx-auto max-w-lg px-6 py-20 text-center">
       <motion.p

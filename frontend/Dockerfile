@@ -5,6 +5,8 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 ARG VITE_MAP_TILES_URL=""
 ENV VITE_MAP_TILES_URL=$VITE_MAP_TILES_URL
+ARG VITE_SITE_URL=""
+ENV VITE_SITE_URL=$VITE_SITE_URL
 RUN npm run build
 
 FROM nginx:1.27-alpine

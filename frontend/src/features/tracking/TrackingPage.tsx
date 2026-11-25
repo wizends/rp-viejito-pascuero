@@ -17,6 +17,7 @@ import { Timeline } from './Timeline';
 import { StagePanel } from './StagePanel';
 import { Collapse, Swap, cascade, fadeUp, pop } from '@/lib/motion';
 import { SantaSelfie } from '@/features/selfie/SantaSelfie';
+import { SITE_NAME, usePageSeo } from '@/lib/seo';
 
 const SleighMap = lazyPage(() => import('./SleighMap').then((m) => ({ default: m.SleighMap })));
 
@@ -42,6 +43,12 @@ export default function TrackingPage() {
   const [skew, setSkew] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const reduced = useReducedMotion();
+
+  usePageSeo({
+    title: q.data ? `Seguimiento de ${q.data.nickname} · ${SITE_NAME}` : `Seguimiento del regalo · ${SITE_NAME}`,
+    description: 'Mira cómo avanza el regalo del Viejito Pascuero desde el Polo Norte hasta tu árbol.',
+    noindex: true,
+  });
 
   useEffect(() => {
     if (q.data) setSkew(new Date(q.data.server_time).getTime() - Date.now());

@@ -48,6 +48,14 @@ export default function PrivacyPage() {
           </p>
         </motion.section>
         <motion.section initial="hidden" whileInView="shown" viewport={{ once: true, margin: '-30px' }} variants={fadeUp}>
+          <h2 className="text-xl">¿Cuentan las visitas?</h2>
+          <p>
+            Sí, de forma anónima, con Vercel Web Analytics: sin cookies y sin datos personales, solo cuántas personas
+            visitan cada tipo de página. Antes de contar una visita ocultamos el código del enlace del niño y el
+            identificador de las cartas.
+          </p>
+        </motion.section>
+        <motion.section initial="hidden" whileInView="shown" viewport={{ once: true, margin: '-30px' }} variants={fadeUp}>
           <h2 className="text-xl">¿Puedo borrar todo?</h2>
           <p>Sí. Desde el panel puedes borrar cada carta o el perfil completo de un niño, con todas sus cartas.</p>
         </motion.section>

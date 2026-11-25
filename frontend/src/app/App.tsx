@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MotionConfig, motion } from 'framer-motion';
+import { Analytics } from '@vercel/analytics/react';
+import { redactEvent } from '@/lib/analytics';
 import { Suspense } from 'react';
 import { lazyPage } from '@/lib/lazyPage';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
@@ -70,6 +72,8 @@ export function App() {
           </Routes>
         </Suspense>
       </BrowserRouter>
+      {/* visitas anónimas (sin cookies); los códigos del niño y los ids de cartas se ocultan */}
+      {__VERCEL_ANALYTICS__ && <Analytics beforeSend={redactEvent} />}
       </MotionConfig>
     </QueryClientProvider>
   );

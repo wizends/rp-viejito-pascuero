@@ -37,6 +37,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), seo],
+    // Vercel Web Analytics solo existe en despliegues de Vercel (VERCEL=1 al compilar ahí);
+    // en Docker o en local no se carga, así no se pide un script que no existe.
+    define: { __VERCEL_ANALYTICS__: JSON.stringify(env.VERCEL === '1' || env.VITE_VERCEL_ANALYTICS === '1') },
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
     server: {
       port: 5173,

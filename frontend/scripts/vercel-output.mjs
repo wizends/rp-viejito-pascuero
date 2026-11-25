@@ -70,7 +70,8 @@ const routes = [
   { src: '^/assets/(.*)$', status: 404, headers: { 'Cache-Control': 'no-store' } },
   // SPA: cualquier otra ruta la resuelve React Router; index.html nunca se guarda en caché
   // para que, tras un despliegue, el navegador pida siempre los archivos nuevos
-  { src: '^/(.*)$', dest: '/index.html', headers: { 'Cache-Control': 'no-cache' } },
+  // (las rutas internas de Vercel, como /_vercel/insights de Web Analytics, quedan fuera)
+  { src: '^/(?!_vercel/)(.*)$', dest: '/index.html', headers: { 'Cache-Control': 'no-cache' } },
 ];
 
 rmSync(out, { recursive: true, force: true });

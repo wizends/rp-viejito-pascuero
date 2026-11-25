@@ -211,6 +211,15 @@ Toda la interfaz usa un mismo lenguaje de movimiento, definido en `frontend/src/
 
 La escena 3D del taller (React Three Fiber) tiene sus propias animaciones y no usa Framer Motion.
 
+### Analítica (Vercel Web Analytics)
+
+La web cuenta visitas con [Vercel Web Analytics](https://vercel.com/docs/analytics), que no usa cookies ni guarda datos personales.
+
+- **Dónde se activa:** el componente `<Analytics />` de `@vercel/analytics` se monta en `frontend/src/app/App.tsx` solo cuando el build se hace en Vercel (`VERCEL=1`). Para forzarlo en otro lado está `VITE_VERCEL_ANALYTICS=1`. En Docker y en local no se carga.
+- **Privacidad:** antes de enviar cada visita, `frontend/src/lib/analytics.ts` quita la query y el `#`, y reemplaza el código del enlace del niño (`/seguimiento/[codigo]`) y el id de la carta (`/postal/[carta]`). La página de privacidad lo explica.
+- **Rutas de Vercel:** las rutas internas `/_vercel/*` quedan fuera del redirect a la app en `scripts/vercel-output.mjs`.
+- **Para verlo funcionando:** en el proyecto de la web en Vercel, activa **Analytics** (pestaña Analytics → Enable) y vuelve a desplegar.
+
 ## Decisiones (y por qué)
 
 Cuando el brief era ambiguo, elegimos la opción más tierna, accesible y segura para niños:

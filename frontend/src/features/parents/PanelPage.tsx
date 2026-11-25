@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { clsx } from 'clsx';
+import { motion } from 'framer-motion';
+import { Swap, cascade, fadeUp } from '@/lib/motion';
 import { Mail, Route } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useSession } from '@/stores/session';
@@ -28,20 +30,30 @@ export default function PanelPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <motion.header initial="hidden" animate="shown" variants={cascade(0.08)} className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-cuento text-4xl text-marino sm:text-5xl">Panel de ayudantes</h1>
-          <p className="mt-1 font-bold text-tinta-suave">Hola, {user.display_name}. Aquí llegan las cartas de tu familia.</p>
+          <motion.h1 variants={fadeUp} className="font-cuento text-4xl text-marino sm:text-5xl">
+            Panel de ayudantes
+          </motion.h1>
+          <motion.p variants={fadeUp} className="mt-1 font-bold text-tinta-suave">
+            Hola, {user.display_name}. Aquí llegan las cartas de tu familia.
+          </motion.p>
         </div>
-      </header>
+      </motion.header>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[300px_1fr]">
-        <aside className="space-y-6">
-          <ChildrenManager children={children.data ?? []} selected={childId} onSelect={setChildId} loading={children.isLoading} />
-          <SettingsCard />
-        </aside>
+        <motion.aside initial="hidden" animate="shown" variants={cascade(0.1, 0.1)} className="space-y-6">
+          <motion.div variants={fadeUp}>
+            <ChildrenManager children={children.data ?? []} selected={childId} onSelect={setChildId} loading={children.isLoading} />
+          </motion.div>
+          <motion.div variants={fadeUp}>
+            <SettingsCard />
+          </motion.div>
+        </motion.aside>
 
         <section aria-label="Detalle del niño o niña" className="min-w-0">
+          {/* al cambiar de niño, su detalle se despide y entra el del otro */}
+          <Swap id={child ? child.id : 'vacio'} variants={fadeUp}>
           {!child ? (
             <div className="papel-crema rounded-galleta p-8 text-center text-tinta shadow-papel">
               <p className="font-cuento text-3xl text-rojo-baya">¡El taller está listo!</p>
@@ -66,21 +78,29 @@ export default function PanelPage() {
                       aria-selected={section === id}
                       onClick={() => setSection(id)}
                       className={clsx(
-                        'inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-extrabold transition-all duration-200 ease-rebote',
-                        section === id ? 'bg-oro text-tinta' : 'text-marino hover:bg-cielo-claro',
+                        'relative inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-extrabold transition-colors duration-200',
+                        section === id ? 'text-tinta' : 'text-marino hover:bg-cielo-claro',
                       )}
                     >
-                      {icon}
-                      {label}
+                      {section === id && (
+                        <motion.span layoutId="panel-seccion" className="absolute inset-0 rounded-full bg-oro" transition={{ type: 'spring', stiffness: 420, damping: 34 }} aria-hidden="true" />
+                      )}
+                      <span className="relative inline-flex items-center gap-1.5">
+                        {icon}
+                        {label}
+                      </span>
                     </button>
                   ))}
                 </div>
               </div>
               <div className="mt-4" role="tabpanel">
-                {section === 'cartas' ? <LettersList childId={child.id} /> : <ShipmentEditor child={child} />}
+                <Swap id={section} variants={fadeUp}>
+                  {section === 'cartas' ? <LettersList childId={child.id} /> : <ShipmentEditor child={child} />}
+                </Swap>
               </div>
             </>
           )}
+          </Swap>
         </section>
       </div>
     </div>

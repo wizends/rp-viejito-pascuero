@@ -3,7 +3,9 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import Cropper, { type Area } from 'react-easy-crop';
 import { Link } from 'react-router-dom';
 import { SealButton } from '@/components/ui/SealButton';
+import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from '@/components/ui/Toast';
+import { Collapse } from '@/lib/motion';
 import { Privacy } from './WriteLetterForm';
 import { validateFile } from './schemas';
 
@@ -106,10 +108,20 @@ export function UploadLetterForm({ disabled, busy, externalAi, onSubmit }: Props
         }}
         className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-4 border-dashed border-marino/20 bg-white/70 p-6 text-center transition-colors hover:border-rojo has-[:focus-visible]:border-oro"
       >
-        <ImagePlus size={36} className="text-rojo" aria-hidden="true" />
-        <span className="font-display text-lg font-extrabold">
-          {file ? `Elegiste: ${file.name}` : 'Toca aquí o arrastra la foto de tu carta'}
-        </span>
+        <motion.span animate={file ? { rotate: [0, -12, 10, 0], scale: [1, 1.15, 1] } : { rotate: 0, scale: 1 }} transition={{ duration: 0.5 }} key={file?.name ?? 'vacio'}>
+          <ImagePlus size={36} className="text-rojo" aria-hidden="true" />
+        </motion.span>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={file?.name ?? 'vacio'}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6, transition: { duration: 0.12 } }}
+            className="font-display text-lg font-extrabold"
+          >
+            {file ? `Elegiste: ${file.name}` : 'Toca aquí o arrastra la foto de tu carta'}
+          </motion.span>
+        </AnimatePresence>
         <span className="text-sm text-tinta-suave">Foto JPG, PNG o WebP · máximo 10 MB</span>
         <input
           id={inputId}
@@ -120,13 +132,14 @@ export function UploadLetterForm({ disabled, busy, externalAi, onSubmit }: Props
           aria-describedby={error ? `${inputId}-err` : undefined}
         />
       </label>
-      {error && (
+      <Collapse show={!!error}>
         <p id={`${inputId}-err`} role="alert" className="text-sm font-bold text-rojo-baya">
           {error}
         </p>
-      )}
+      </Collapse>
 
-      {canPreview && preview && (
+      <Collapse show={!!(canPreview && preview)}>
+        {preview && (
         <div className="space-y-2">
           <div className="relative h-72 overflow-hidden rounded-2xl bg-marino sm:h-96">
             <Cropper
@@ -155,12 +168,13 @@ export function UploadLetterForm({ disabled, busy, externalAi, onSubmit }: Props
             </button>
           </div>
         </div>
-      )}
-      {file && !canPreview && (
+        )}
+      </Collapse>
+      <Collapse show={!!file && !canPreview}>
         <p className="flex items-center gap-2 rounded-xl bg-white/70 p-3 text-sm font-bold">
           <FileText size={18} aria-hidden="true" /> Esta foto no tiene vista previa, pero igual llegará al Polo Norte.
         </p>
-      )}
+      </Collapse>
 
       <div>
         <label htmlFor="mensaje-foto" className="text-sm font-extrabold">

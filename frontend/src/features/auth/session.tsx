@@ -8,6 +8,7 @@ import { useScene } from '@/stores/scene';
 import { useSession } from '@/stores/session';
 import { toast } from '@/components/ui/Toast';
 import { SleighLoader } from '@/components/ui/SleighLoader';
+import { Swap } from '@/lib/motion';
 
 /** Consulta la sesión al cargar y escucha los estados de cartas por WebSocket. */
 export function SessionBootstrap() {
@@ -71,13 +72,16 @@ function usePollLetterStatus() {
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { user, checked } = useSession();
   const loc = useLocation();
-  if (!checked) {
-    return (
-      <div className="grid min-h-[60vh] place-items-center">
-        <SleighLoader progress={50} label="Revisando tu credencial" />
-      </div>
-    );
-  }
-  if (!user) return <Navigate to="/entrar" replace state={{ from: loc.pathname }} />;
-  return <>{children}</>;
+  if (checked && !user) return <Navigate to="/entrar" replace state={{ from: loc.pathname }} />;
+  return (
+    <Swap id={checked ? 'listo' : 'revisando'}>
+      {checked ? (
+        children
+      ) : (
+        <div className="grid min-h-[60vh] place-items-center">
+          <SleighLoader progress={50} label="Revisando tu credencial" />
+        </div>
+      )}
+    </Swap>
+  );
 }

@@ -22,6 +22,8 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { clsx } from 'clsx';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Collapse, cascade, fadeUp, lifecycle, listItem, pop } from '@/lib/motion';
 import { api } from '@/lib/api';
 import { formatDateTime, fromLocalInput, toLocalInput } from '@/lib/time';
 import { STOP_ICONS, type Child, type Shipment, type Stop, type StopInput } from '@/lib/types';
@@ -91,9 +93,9 @@ export function ShipmentEditor({ child }: { child: Child }) {
   };
 
   return (
-    <div className="space-y-5">
+    <motion.div initial="hidden" animate="shown" variants={cascade(0.08)} className="space-y-5">
       {/* Llegada + enlace del niño */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <motion.div variants={fadeUp} className="grid gap-4 md:grid-cols-2">
         <div className="papel-crema rounded-[1.4rem] p-4 text-tinta shadow-papel">
           <label htmlFor="arrival" className="font-display font-extrabold">
             Llegada del Viejito (Nochebuena, hora de Chile)
@@ -133,12 +135,14 @@ export function ShipmentEditor({ child }: { child: Child }) {
             </a>
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      <TreePhotoCard child={child} shipment={sh} />
+      <motion.div variants={fadeUp}>
+        <TreePhotoCard child={child} shipment={sh} />
+      </motion.div>
 
       {/* Paradas */}
-      <div className="papel-kraft rounded-galleta p-4 text-tinta shadow-papel sm:p-6">
+      <motion.div variants={fadeUp} className="papel-kraft rounded-galleta p-4 text-tinta shadow-papel sm:p-6">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="font-display text-2xl">Paradas del regalo</h3>
           <div className="ml-auto flex flex-wrap gap-2">
@@ -154,7 +158,7 @@ export function ShipmentEditor({ child }: { child: Child }) {
           Arrastra para ordenar (o usa espacio + flechas). Las paradas con avance automático se completan solas a su hora.
         </p>
 
-        {editing === 'new' && (
+        <Collapse show={editing === 'new'}>
           <StopEditor
             onCancel={() => setEditing(null)}
             onSave={async (v) => {
@@ -163,16 +167,19 @@ export function ShipmentEditor({ child }: { child: Child }) {
               setEditing(null);
             }}
           />
-        )}
+        </Collapse>
 
-        {stops.length === 0 && editing !== 'new' && <p className="mt-6 text-center font-bold">Aún no hay paradas. ¡Prueba la plantilla sugerida!</p>}
+        <Collapse show={stops.length === 0 && editing !== 'new'}>
+          <p className="mt-6 text-center font-bold">Aún no hay paradas. ¡Prueba la plantilla sugerida!</p>
+        </Collapse>
 
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={stops.map((s) => s.id)} strategy={verticalListSortingStrategy}>
             <ol className="mt-4 space-y-2">
+              <AnimatePresence initial={false}>
               {stops.map((s, i) =>
                 editing !== 'new' && editing?.id === s.id ? (
-                  <li key={s.id}>
+                  <motion.li key={`editar-${s.id}`} {...lifecycle} variants={pop}>
                     <StopEditor
                       stop={s}
                       onCancel={() => setEditing(null)}
@@ -181,7 +188,7 @@ export function ShipmentEditor({ child }: { child: Child }) {
                         setEditing(null);
                       }}
                     />
-                  </li>
+                  </motion.li>
                 ) : (
                   <SortableStop
                     key={s.id}
@@ -193,11 +200,12 @@ export function ShipmentEditor({ child }: { child: Child }) {
                   />
                 ),
               )}
+              </AnimatePresence>
             </ol>
           </SortableContext>
         </DndContext>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -213,12 +221,17 @@ function SortableStop({ stop, index, onEdit, onToggle, onDelete }: { stop: Stop;
         isDragging && 'z-10 scale-[1.02] shadow-brillo',
       )}
     >
+      <motion.div {...lifecycle} variants={listItem} className="flex min-w-0 flex-1 items-center gap-2">
       <button type="button" {...attributes} {...listeners} aria-label={`Mover parada ${index + 1}: ${stop.nombre}`} className="cursor-grab rounded-lg p-1.5 text-tinta-suave hover:bg-kraft/40 active:cursor-grabbing">
         <GripVertical size={18} />
       </button>
-      <span className={clsx('grid h-10 w-10 shrink-0 place-items-center rounded-full', done ? 'bg-muerdago text-white' : 'bg-noche text-oro-suave')}>
+      <motion.span
+        animate={{ scale: done ? [1, 1.25, 1] : 1, rotate: done ? [0, -12, 0] : 0 }}
+        transition={{ duration: 0.45 }}
+        className={clsx('grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors duration-300', done ? 'bg-muerdago text-white' : 'bg-noche text-oro-suave')}
+      >
         <StopGlyph icon={stop.icono} size={20} />
-      </span>
+      </motion.span>
       <div className="min-w-0 flex-1">
         <p className={clsx('truncate font-extrabold', done && 'text-pino')}>{stop.nombre}</p>
         <p className="truncate text-xs text-tinta-suave">
@@ -238,7 +251,21 @@ function SortableStop({ stop, index, onEdit, onToggle, onDelete }: { stop: Stop;
       <button type="button" onClick={onDelete} aria-label={`Borrar ${stop.nombre}`} className="rounded-full p-2 text-rojo-baya hover:bg-kraft/40">
         <Trash2 size={16} />
       </button>
+      </motion.div>
     </li>
+  );
+}
+
+/** Error de un campo: aparece con un saltito y se va al corregirlo. */
+function FieldError({ message }: { message?: string }) {
+  return (
+    <AnimatePresence initial={false}>
+      {message && (
+        <motion.span key={message} {...lifecycle} variants={pop} className="block origin-left text-xs text-rojo-baya">
+          {message}
+        </motion.span>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -278,24 +305,26 @@ function StopEditor({ stop, onSave, onCancel }: { stop?: Stop; onSave: (v: StopI
       <label className="text-sm font-extrabold sm:col-span-2">
         Nombre de la parada
         <input {...register('nombre')} className={inputCls} aria-invalid={!!errors.nombre} />
-        {errors.nombre && <span className="text-xs text-rojo-baya">{errors.nombre.message}</span>}
+        <FieldError message={errors.nombre?.message} />
       </label>
       <fieldset className="sm:col-span-2">
         <legend className="text-sm font-extrabold">Ícono</legend>
         <div className="mt-1 flex flex-wrap gap-1.5" role="radiogroup">
           {STOP_ICONS.map((ic) => (
-            <button
+            <motion.button
               key={ic}
+              animate={{ scale: icon === ic ? 1.1 : 1 }}
+              whileTap={{ scale: 0.88 }}
               type="button"
               role="radio"
               aria-checked={icon === ic}
               aria-label={STOP_ICON_LABELS[ic]}
               title={STOP_ICON_LABELS[ic]}
               onClick={() => setValue('icono', ic)}
-              className={clsx('grid h-10 w-10 place-items-center rounded-full transition-all duration-200 ease-rebote', icon === ic ? 'scale-110 bg-rojo text-white shadow-brillo' : 'bg-white text-tinta hover:bg-oro-suave')}
+              className={clsx('grid h-10 w-10 place-items-center rounded-full transition-all duration-200 ease-rebote', icon === ic ? 'bg-rojo text-white shadow-brillo' : 'bg-white text-tinta hover:bg-oro-suave')}
             >
               <StopGlyph icon={ic} size={18} />
-            </button>
+            </motion.button>
           ))}
         </div>
       </fieldset>
@@ -314,12 +343,12 @@ function StopEditor({ stop, onSave, onCancel }: { stop?: Stop; onSave: (v: StopI
       <label className="text-sm font-extrabold">
         Latitud (opcional, para el mapa)
         <input inputMode="decimal" {...register('lat')} placeholder="-33.45" className={inputCls} aria-invalid={!!errors.lat} />
-        {errors.lat && <span className="text-xs text-rojo-baya">{errors.lat.message}</span>}
+        <FieldError message={errors.lat?.message} />
       </label>
       <label className="text-sm font-extrabold">
         Longitud (opcional)
         <input inputMode="decimal" {...register('lng')} placeholder="-70.66" className={inputCls} aria-invalid={!!errors.lng} />
-        {errors.lng && <span className="text-xs text-rojo-baya">{errors.lng.message}</span>}
+        <FieldError message={errors.lng?.message} />
       </label>
       <p className="text-xs text-tinta-suave sm:col-span-2">
         Consejo: usa la ciudad, no la dirección de tu casa. Basta con coordenadas aproximadas.

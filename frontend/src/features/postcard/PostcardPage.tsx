@@ -16,10 +16,12 @@ import {
   Undo2,
   RefreshCcw,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, ApiError } from '@/lib/api';
 import { readJSON, writeJSON } from '@/lib/storage';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Collapse, Swap, cascade, fade, fadeUp, lifecycle, pop } from '@/lib/motion';
 import { MagicButton } from '@/components/ui/MagicButton';
 import { toast } from '@/components/ui/Toast';
 import {
@@ -128,13 +130,15 @@ export default function PostcardPage() {
     void loadFonts().then(() => setFontsReady(true));
   }, []);
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // el lienzo se monta después de que se despide la pantalla de carga: hay que redibujar entonces
+  const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null);
   const letterBox = useRef<Box | null>(null);
   const [sel, setSel] = useState<Selection>(null);
   const drag = useRef<{ dx: number; dy: number; pointer: number } | null>(null);
 
   useEffect(() => {
-    const cv = canvasRef.current;
+    const cv = canvasEl;
     if (!cv || !p || !stickers || !content) return;
     const f = FORMATS[p.format];
     if (cv.width !== f.w || cv.height !== f.h) {
@@ -142,7 +146,7 @@ export default function PostcardPage() {
       cv.height = f.h;
     }
     letterBox.current = renderPostcard(cv.getContext('2d')!, p, { stickers, letter: content, link: window.location.host }, sel);
-  }, [p, sel, stickers, content, fontsReady]);
+  }, [p, sel, stickers, content, fontsReady, canvasEl]);
 
   const update = (fn: (q: Postcard) => Postcard) => setP((q) => (q ? fn(q) : q));
   const setField = <K extends keyof Postcard>(k: K, v: Postcard[K]) => update((q) => ({ ...q, [k]: v }));
@@ -375,28 +379,54 @@ export default function PostcardPage() {
     setCanUndo(false);
   };
 
-  if (letter.isError) return <Problem text="No encontramos esa carta." />;
-  if (letter.isLoading || !p || !stickers || (letter.data?.has_image && photo.isLoading)) return <p className="p-10 text-center font-bold text-marino">Preparando papel y lápices de colores…</p>;
-  if (!content) return <Problem text="Esta carta ya no tiene foto ni texto para la postal (la foto se borró por privacidad). Puedes transcribirla en el panel." />;
+  if (letter.isError) return <Swap id="sin-carta" variants={fadeUp}><Problem text="No encontramos esa carta." /></Swap>;
+  if (letter.isLoading || !p || !stickers || (letter.data?.has_image && photo.isLoading))
+    return (
+      <Swap id="cargando" variants={fade}>
+        <p className="p-10 text-center font-bold text-marino">Preparando papel y lápices de colores…</p>
+      </Swap>
+    );
+  if (!content)
+    return (
+      <Swap id="sin-contenido" variants={fadeUp}>
+        <Problem text="Esta carta ya no tiene foto ni texto para la postal (la foto se borró por privacidad). Puedes transcribirla en el panel." />
+      </Swap>
+    );
 
   const f = FORMATS[p.format];
   const selSticker = sel?.type === 'sticker' ? p.stickers.find((s) => s.id === sel.id) : null;
   const selName = sel?.type === 'carta' ? 'Carta' : selSticker ? STICKERS[selSticker.sticker].label : null;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      <Link to="/panel" className="inline-flex items-center gap-1.5 text-sm font-extrabold text-marino hover:underline">
-        <ArrowLeft size={16} aria-hidden="true" /> Volver al panel
-      </Link>
-      <h1 className="mt-2 font-cuento text-4xl text-marino sm:text-5xl">Postal navideña</h1>
-      <p className="mt-1 font-bold text-tinta-suave">Decora la carta{nickname ? ` de ${nickname}` : ''} y compártela en tus redes.</p>
+    <Swap id="editor" variants={fadeUp}>
+    <motion.div initial="hidden" animate="shown" variants={cascade(0.06)} className="mx-auto max-w-6xl px-4 py-6">
+      <motion.div variants={fadeUp}>
+        <Link to="/panel" className="group inline-flex items-center gap-1.5 text-sm font-extrabold text-marino hover:underline">
+          <ArrowLeft size={16} aria-hidden="true" className="transition-transform group-hover:-translate-x-1" /> Volver al panel
+        </Link>
+      </motion.div>
+      <motion.h1 variants={fadeUp} className="mt-2 font-cuento text-4xl text-marino sm:text-5xl">
+        Postal navideña
+      </motion.h1>
+      <motion.p variants={fadeUp} className="mt-1 font-bold text-tinta-suave">
+        Decora la carta{nickname ? ` de ${nickname}` : ''} y compártela en tus redes.
+      </motion.p>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* el lienzo queda a la vista mientras se baja por las opciones */}
         <div className="sticky top-0 z-20 -mx-4 self-start bg-[#f3ead8]/95 px-4 pb-2 pt-2 backdrop-blur-sm lg:top-4 lg:mx-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none [--lienzo-h:min(36vh,calc(100vh-260px))] lg:[--lienzo-h:calc(100vh-200px)]">
-          <div className="mx-auto" style={{ maxWidth: `min(100%, calc(var(--lienzo-h) * ${f.w / f.h}))` }}>
+          <motion.div
+            layout
+            variants={pop}
+            transition={{ layout: { type: 'spring', stiffness: 260, damping: 30 } }}
+            className="mx-auto"
+            style={{ maxWidth: `min(100%, calc(var(--lienzo-h) * ${f.w / f.h}))` }}
+          >
             <canvas
-              ref={canvasRef}
+              ref={(el) => {
+                canvasRef.current = el;
+                setCanvasEl(el);
+              }}
               width={f.w}
               height={f.h}
               tabIndex={0}
@@ -412,12 +442,15 @@ export default function PostcardPage() {
                 ghost?.over && 'ring-4',
               )}
             />
-          </div>
+          </motion.div>
 
           <div className="mt-2 flex min-h-[44px] flex-wrap items-center justify-center gap-2" aria-live="polite">
+            <AnimatePresence mode="wait" initial={false}>
             {sel && selName ? (
-              <>
-                <span className="mr-1 text-sm font-extrabold text-tinta-suave">{selName}:</span>
+              <motion.div key={`herramientas-${sel.type}`} initial="hidden" animate="shown" exit="gone" variants={cascade(0.035)} className="flex flex-wrap items-center justify-center gap-2">
+                <motion.span variants={fade} className="mr-1 text-sm font-extrabold text-tinta-suave">
+                  {selName}:
+                </motion.span>
                 <Tool label="Más chico" onClick={() => edit((it) => ({ size: it.size / 1.12 }))} icon={<Minus size={16} />} />
                 <Tool label="Más grande" onClick={() => edit((it) => ({ size: it.size * 1.12 }))} icon={<Plus size={16} />} />
                 <Tool label="Girar a la izquierda" onClick={() => edit((it) => ({ rot: it.rot - 0.15 }))} icon={<RotateCcw size={16} />} />
@@ -428,10 +461,13 @@ export default function PostcardPage() {
                     <Tool label="Quitar sticker" onClick={removeSel} icon={<Trash2 size={16} />} danger />
                   </>
                 )}
-              </>
+              </motion.div>
             ) : (
-              <p className="text-center text-xs font-bold text-tinta-suave sm:text-sm">Arrastra stickers al lienzo. Toca uno (o la carta) para moverlo, agrandarlo o girarlo.</p>
+              <motion.p key="consejo" {...lifecycle} variants={fade} className="text-center text-xs font-bold text-tinta-suave sm:text-sm">
+                Arrastra stickers al lienzo. Toca uno (o la carta) para moverlo, agrandarlo o girarlo.
+              </motion.p>
             )}
+            </AnimatePresence>
           </div>
 
           <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
@@ -444,21 +480,29 @@ export default function PostcardPage() {
                 Descargar postal
               </MagicButton>
             )}
-            {canUndo ? (
-              <MagicButton variant="oro" icon={<Undo2 size={16} aria-hidden="true" />} onClick={undoReset}>
-                Deshacer
-              </MagicButton>
-            ) : (
-              <MagicButton variant="crema" icon={<RefreshCcw size={16} aria-hidden="true" />} onClick={reset}>
-                Empezar de nuevo
-              </MagicButton>
-            )}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span key={canUndo ? 'deshacer' : 'reiniciar'} {...lifecycle} variants={pop} className="inline-flex">
+                {canUndo ? (
+                  <MagicButton variant="oro" icon={<Undo2 size={16} aria-hidden="true" />} onClick={undoReset}>
+                    Deshacer
+                  </MagicButton>
+                ) : (
+                  <MagicButton variant="crema" icon={<RefreshCcw size={16} aria-hidden="true" />} onClick={reset}>
+                    Empezar de nuevo
+                  </MagicButton>
+                )}
+              </motion.span>
+            </AnimatePresence>
           </div>
           <SaveStatus state={saveState} />
-          {canUndo && <p className="mt-1 text-center text-xs font-bold text-tinta-suave" role="status">Postal reiniciada. ¿Te arrepentiste? Toca Deshacer.</p>}
+          <Collapse show={canUndo}>
+            <p className="mt-1 text-center text-xs font-bold text-tinta-suave" role="status">
+              Postal reiniciada. ¿Te arrepentiste? Toca Deshacer.
+            </p>
+          </Collapse>
         </div>
 
-        <aside className="space-y-4">
+        <motion.aside variants={cascade(0.06)} className="space-y-4">
           <Panel title="Estilo">
             <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Estilo gráfico">
               {STYLE_IDS.map((st) => (
@@ -472,7 +516,7 @@ export default function PostcardPage() {
             <Choice<Format> value={p.format} onChange={(v) => setField('format', v)} options={Object.entries(FORMATS).map(([k, v]) => [k as Format, v.label, v.hint])} />
           </Panel>
 
-          {photo.data && text && (
+          <Collapse show={!!(photo.data && text)}>
             <Panel title="La carta">
               <Choice<'foto' | 'texto'>
                 value={show}
@@ -483,12 +527,12 @@ export default function PostcardPage() {
                 ]}
               />
             </Panel>
-          )}
+          </Collapse>
 
           <Panel title="Fondo">
             <div className="grid grid-cols-6 gap-2" role="radiogroup" aria-label="Fondo">
               {(Object.keys(THEMES) as Theme[]).map((t) => (
-                <button
+                <motion.button
                   key={t}
                   type="button"
                   role="radio"
@@ -496,12 +540,17 @@ export default function PostcardPage() {
                   aria-label={THEMES[t].label}
                   title={THEMES[t].label}
                   onClick={() => setField('theme', t)}
-                  className={clsx('aspect-square rounded-xl ring-2 transition-transform hover:scale-105', p.theme === t ? 'ring-oro ring-offset-2' : 'ring-black/10')}
+                  animate={{ scale: p.theme === t ? 1.06 : 1 }}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.9 }}
+                  className={clsx('aspect-square rounded-xl ring-2', p.theme === t ? 'ring-oro ring-offset-2' : 'ring-black/10')}
                   style={{ background: THEMES[t].swatch }}
                 />
               ))}
             </div>
-            <p className="mt-2 text-xs font-extrabold text-tinta-suave">{THEMES[p.theme].label}</p>
+            <Swap id={p.theme}>
+              <p className="mt-2 text-xs font-extrabold text-tinta-suave">{THEMES[p.theme].label}</p>
+            </Swap>
           </Panel>
 
           <Panel title="Borde">
@@ -514,11 +563,12 @@ export default function PostcardPage() {
                   aria-checked={p.frame === k}
                   onClick={() => setField('frame', k)}
                   className={clsx(
-                    'rounded-xl px-2 py-2 text-xs font-extrabold leading-tight transition-colors',
-                    p.frame === k ? 'bg-oro text-tinta' : 'bg-white text-marino hover:bg-cielo-claro',
+                    'relative rounded-xl bg-white px-2 py-2 text-xs font-extrabold leading-tight transition-colors',
+                    p.frame === k ? 'text-tinta' : 'text-marino hover:bg-cielo-claro',
                   )}
                 >
-                  {FRAMES[k]}
+                  {p.frame === k && <motion.span layoutId="postal-borde" className="absolute inset-0 rounded-xl bg-oro" transition={{ type: 'spring', stiffness: 420, damping: 34 }} aria-hidden="true" />}
+                  <span className="relative">{FRAMES[k]}</span>
                 </button>
               ))}
             </div>
@@ -545,9 +595,11 @@ export default function PostcardPage() {
                 <h3 className="mb-1.5 text-xs font-extrabold uppercase tracking-wide text-tinta-suave">{g.label}</h3>
                 <div className="grid grid-cols-6 gap-1.5">
                   {g.ids.map((id) => (
-                    <button
+                    <motion.button
                       key={id}
                       type="button"
+                      whileHover={{ scale: 1.12, rotate: -4 }}
+                      whileTap={{ scale: 0.9 }}
                       onPointerDown={paletteDown(id)}
                       onPointerMove={paletteMove}
                       onPointerUp={paletteUp}
@@ -556,33 +608,42 @@ export default function PostcardPage() {
                       onClick={(e) => e.detail === 0 && addSticker(id)}
                       aria-label={`Agregar ${STICKERS[id].label}`}
                       title={STICKERS[id].label}
-                      className="grid aspect-square cursor-grab touch-none select-none place-items-center rounded-xl bg-noche-700 p-1.5 transition-transform duration-200 ease-rebote hover:scale-110 active:cursor-grabbing"
+                      className="grid aspect-square cursor-grab touch-none select-none place-items-center rounded-xl bg-noche-700 p-1.5 active:cursor-grabbing"
                     >
                       <img src={svgUrl(id)} alt="" className="h-full w-full" draggable={false} />
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
               </div>
             ))}
           </Panel>
 
-          <p className="flex gap-2 rounded-2xl bg-hielo/70 p-3 text-xs font-bold text-noche">
+          <motion.p variants={fadeUp} className="flex gap-2 rounded-2xl bg-hielo/70 p-3 text-xs font-bold text-noche">
             <ShieldAlert size={18} className="shrink-0" aria-hidden="true" />
             Antes de publicar, revisa que en la carta no se vean nombres completos, la dirección, el colegio ni la cara de tu hijo o hija.
-          </p>
+          </motion.p>
 
-        </aside>
+        </motion.aside>
       </div>
-      {ghost && (
-        <img
-          src={svgUrl(ghost.id)}
-          alt=""
-          aria-hidden="true"
-          className={clsx('pointer-events-none fixed z-50 h-20 w-20 -translate-x-1/2 -translate-y-1/2 drop-shadow-lg transition-transform', ghost.over ? 'scale-110' : 'scale-90 opacity-70')}
-          style={{ left: ghost.x, top: ghost.y }}
-        />
-      )}
-    </div>
+      {/* el sticker que se arrastra: crece sobre el lienzo y se desvanece al soltarlo */}
+      <AnimatePresence>
+        {ghost && (
+          <motion.img
+            key="fantasma"
+            src={svgUrl(ghost.id)}
+            alt=""
+            aria-hidden="true"
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: ghost.over ? 1.1 : 0.9, opacity: ghost.over ? 1 : 0.7, rotate: ghost.over ? -6 : 0 }}
+            exit={{ scale: 1.3, opacity: 0, transition: { duration: 0.15 } }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            className="pointer-events-none fixed z-50 -ml-10 -mt-10 h-20 w-20 drop-shadow-lg"
+            style={{ left: ghost.x, top: ghost.y }}
+          />
+        )}
+      </AnimatePresence>
+    </motion.div>
+    </Swap>
   );
 }
 
@@ -604,13 +665,16 @@ const STYLE_INK: Record<Style, { color: string; shadow: string }> = {
 /** Tarjeta del selector de estilo con una muestra de su letra. */
 function StyleCard({ style, active, onPick }: { style: Style; active: boolean; onPick: () => void }) {
   return (
-    <button
+    <motion.button
       type="button"
       role="radio"
       aria-checked={active}
       onClick={onPick}
+      whileHover={{ y: -3 }}
+      whileTap={{ scale: 0.96 }}
+      animate={{ scale: active ? 1.02 : 1 }}
       className={clsx(
-        'overflow-hidden rounded-xl text-left ring-2 transition-transform hover:scale-[1.03]',
+        'overflow-hidden rounded-xl text-left ring-2',
         active ? 'ring-oro ring-offset-2' : 'ring-black/10',
         style === 'crayon' && 'col-span-2',
       )}
@@ -622,7 +686,7 @@ function StyleCard({ style, active, onPick }: { style: Style; active: boolean; o
         <span className="block text-sm font-extrabold text-tinta">{STYLES[style].label}</span>
         <span className="block text-[11px] font-semibold leading-tight text-tinta-suave">{STYLES[style].hint}</span>
       </span>
-    </button>
+    </motion.button>
   );
 }
 
@@ -640,17 +704,28 @@ function SaveStatus({ state }: { state: SaveState }) {
     error: { icon: <CloudOff size={14} aria-hidden="true" />, text: 'Sin conexión: quedó guardada en este equipo y se subirá al volver a editar.' },
   }[state];
   return (
-    <p role="status" className={clsx('mt-1 flex items-center justify-center gap-1.5 text-center text-xs font-bold', state === 'error' ? 'text-rojo-baya' : 'text-tinta-suave')}>
-      {map.icon}
-      {map.text}
-    </p>
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.p
+        key={state}
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
+        role="status"
+        className={clsx('mt-1 flex items-center justify-center gap-1.5 text-center text-xs font-bold', state === 'error' ? 'text-rojo-baya' : 'text-tinta-suave')}
+      >
+        {map.icon}
+        {map.text}
+      </motion.p>
+    </AnimatePresence>
   );
 }
 
 function Problem({ text }: { text: string }) {
   return (
     <div className="mx-auto max-w-lg p-10 text-center">
-      <p className="font-cuento text-4xl text-rojo">Ups</p>
+      <motion.p initial={{ rotate: -8, scale: 0.6, opacity: 0 }} animate={{ rotate: 0, scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 12 }} className="font-cuento text-4xl text-rojo">
+        Ups
+      </motion.p>
       <p className="mt-2 font-semibold text-tinta-suave">{text}</p>
       <Link to="/panel" className="mt-4 inline-block font-extrabold text-marino underline">
         Volver al panel
@@ -661,14 +736,15 @@ function Problem({ text }: { text: string }) {
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="papel-crema rounded-[1.4rem] p-4 text-tinta shadow-papel">
+    <motion.section variants={fadeUp} className="papel-crema rounded-[1.4rem] p-4 text-tinta shadow-papel">
       <h2 className="mb-2 font-display text-lg font-extrabold">{title}</h2>
       {children}
-    </section>
+    </motion.section>
   );
 }
 
 function Choice<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: [T, string, string][] }) {
+  const group = useId();
   return (
     <div className="grid grid-cols-2 gap-2" role="radiogroup">
       {options.map(([k, label, hint]) => (
@@ -678,10 +754,11 @@ function Choice<T extends string>({ value, onChange, options }: { value: T; onCh
           role="radio"
           aria-checked={value === k}
           onClick={() => onChange(k)}
-          className={clsx('rounded-xl px-3 py-2 text-left transition-colors', value === k ? 'bg-oro text-tinta' : 'bg-white text-marino hover:bg-cielo-claro')}
+          className={clsx('relative rounded-xl bg-white px-3 py-2 text-left transition-colors', value === k ? 'text-tinta' : 'text-marino hover:bg-cielo-claro')}
         >
-          <span className="block text-sm font-extrabold">{label}</span>
-          <span className="block text-xs font-semibold opacity-75">{hint}</span>
+          {value === k && <motion.span layoutId={`opcion-${group}`} className="absolute inset-0 rounded-xl bg-oro" transition={{ type: 'spring', stiffness: 420, damping: 34 }} aria-hidden="true" />}
+          <span className="relative block text-sm font-extrabold">{label}</span>
+          <span className="relative block text-xs font-semibold opacity-75">{hint}</span>
         </button>
       ))}
     </div>
@@ -690,14 +767,17 @@ function Choice<T extends string>({ value, onChange, options }: { value: T; onCh
 
 function Tool({ label, onClick, icon, danger }: { label: string; onClick: () => void; icon: React.ReactNode; danger?: boolean }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={clsx('grid h-10 w-10 place-items-center rounded-full bg-white shadow-papel transition-transform hover:scale-105', danger ? 'text-rojo-baya' : 'text-marino')}
+      variants={pop}
+      whileHover={{ scale: 1.1 }}
+      whileTap={{ scale: 0.88 }}
+      className={clsx('grid h-10 w-10 place-items-center rounded-full bg-white shadow-papel', danger ? 'text-rojo-baya' : 'text-marino')}
     >
       {icon}
-    </button>
+    </motion.button>
   );
 }

@@ -1,4 +1,5 @@
 import { clsx } from 'clsx';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, Music, Pause, Play, SkipForward } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { SONGS } from '@/lib/music';
@@ -23,7 +24,11 @@ export function MusicQuickButton({ className }: { className?: string }) {
         className,
       )}
     >
-      {playing ? <Equalizer /> : <Music size={19} strokeWidth={2.5} aria-hidden="true" />}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.span key={playing ? 'suena' : 'calla'} initial={{ scale: 0.5, opacity: 0, rotate: -30 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} exit={{ scale: 0.5, opacity: 0, transition: { duration: 0.1 } }} className="grid place-items-center">
+          {playing ? <Equalizer /> : <Music size={19} strokeWidth={2.5} aria-hidden="true" />}
+        </motion.span>
+      </AnimatePresence>
     </button>
   );
 }
@@ -41,15 +46,28 @@ export function MusicPanel({ compact = false }: { compact?: boolean }) {
               onClick={() => (i === index && playing ? toggle() : playSong(i))}
               aria-current={i === index ? 'true' : undefined}
               className={clsx(
-                'flex w-full items-center gap-2.5 rounded-xl px-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oro',
+                'relative flex w-full items-center gap-2.5 rounded-xl px-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oro',
                 compact ? 'py-1.5' : 'min-h-[48px] py-2',
-                i === index ? 'bg-oro-suave' : 'hover:bg-cielo-claro',
+                i !== index && 'hover:bg-cielo-claro',
               )}
             >
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-pino text-crema">
-                {i === index && playing ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
+              {i === index && (
+                <motion.span layoutId={compact ? 'cancion-actual-mini' : 'cancion-actual'} className="absolute inset-0 rounded-xl bg-oro-suave" transition={{ type: 'spring', stiffness: 420, damping: 34 }} aria-hidden="true" />
+              )}
+              <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full bg-pino text-crema">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={i === index && playing ? 'pausa' : 'play'}
+                    initial={{ scale: 0.4, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.4, opacity: 0, transition: { duration: 0.1 } }}
+                    className="grid place-items-center"
+                  >
+                    {i === index && playing ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
+                  </motion.span>
+                </AnimatePresence>
               </span>
-              <span className="min-w-0">
+              <span className="relative min-w-0">
                 <span className="block truncate text-sm font-extrabold text-tinta">{s.title}</span>
                 <span className="block truncate text-xs font-semibold text-tinta-suave">{s.origin}</span>
               </span>
@@ -121,7 +139,11 @@ export function MusicControl() {
           pinoShadow,
         )}
       >
-        {playing ? <Equalizer /> : <Music size={19} strokeWidth={2.5} aria-hidden="true" />}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span key={playing ? 'suena' : 'calla'} initial={{ scale: 0.5, opacity: 0, rotate: -30 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} exit={{ scale: 0.5, opacity: 0, transition: { duration: 0.1 } }} className="grid place-items-center">
+            {playing ? <Equalizer /> : <Music size={19} strokeWidth={2.5} aria-hidden="true" />}
+          </motion.span>
+        </AnimatePresence>
       </button>
       <button
         type="button"
@@ -134,12 +156,22 @@ export function MusicControl() {
         <ChevronDown size={16} strokeWidth={2.5} aria-hidden="true" className={clsx('transition-transform', open && 'rotate-180')} />
       </button>
 
-      {open && (
-        <div id={panelId} className="absolute right-0 top-full z-50 mt-2 w-80 rounded-2xl bg-white p-3 text-tinta shadow-papel ring-1 ring-black/5">
-          <p className="mb-2 font-display text-base font-extrabold">Música navideña</p>
-          <MusicPanel compact />
-        </div>
-      )}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="panel"
+            id={panelId}
+            initial={{ opacity: 0, y: -8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 420, damping: 30 } }}
+            exit={{ opacity: 0, y: -6, scale: 0.97, transition: { duration: 0.14 } }}
+            style={{ transformOrigin: 'top right' }}
+            className="absolute right-0 top-full z-50 mt-2 w-80 rounded-2xl bg-white p-3 text-tinta shadow-papel ring-1 ring-black/5"
+          >
+            <p className="mb-2 font-display text-base font-extrabold">Música navideña</p>
+            <MusicPanel compact />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

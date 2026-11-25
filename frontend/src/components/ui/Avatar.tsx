@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import type { Avatar as AvatarId } from '@/lib/types';
 
 const CONFIG: Record<AvatarId, { kind: 'duende' | 'reno'; main: string; accent: string; label: string }> = {
@@ -15,7 +16,18 @@ export const AVATAR_LABEL = (id: AvatarId) => CONFIG[id]?.label ?? 'Avatar';
 export function Avatar({ id, size = 56, className }: { id: AvatarId; size?: number; className?: string }) {
   const c = CONFIG[id] ?? CONFIG.duende_rojo;
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" className={className} role="img" aria-label={c.label}>
+    <motion.svg
+      key={id}
+      initial={{ scale: 0.7, opacity: 0, rotate: -8 }}
+      animate={{ scale: 1, opacity: 1, rotate: 0 }}
+      transition={{ type: 'spring', stiffness: 420, damping: 18 }}
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      className={className}
+      role="img"
+      aria-label={c.label}
+    >
       <circle cx="32" cy="32" r="31" fill="#cfe8f5" />
       {c.kind === 'duende' ? (
         <>
@@ -33,7 +45,17 @@ export function Avatar({ id, size = 56, className }: { id: AvatarId; size?: numb
           <circle cx="32" cy="35" r="18" fill={c.main} />
           <ellipse cx="32" cy="44" rx="10" ry="8" fill="#e8c9a0" />
           <circle cx="32" cy="40" r={id === 'reno_brasita' ? 5 : 3.5} fill={c.accent} />
-          {id === 'reno_brasita' && <circle cx="32" cy="40" r="8" fill="#ff2a3a" opacity="0.25" />}
+          {id === 'reno_brasita' && (
+            <motion.circle
+              cx="32"
+              cy="40"
+              r="8"
+              fill="#ff2a3a"
+              animate={{ opacity: [0.15, 0.45, 0.15], scale: [1, 1.2, 1] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ transformOrigin: '32px 40px' }}
+            />
+          )}
         </>
       )}
       <circle cx="25" cy="34" r="2.6" fill="#1b1420" />
@@ -43,6 +65,6 @@ export function Avatar({ id, size = 56, className }: { id: AvatarId; size?: numb
       <ellipse cx="21" cy="40" rx="3.2" ry="2" fill="#ff8fa0" opacity="0.8" />
       <ellipse cx="43" cy="40" rx="3.2" ry="2" fill="#ff8fa0" opacity="0.8" />
       {c.kind === 'duende' && <path d="M27 44 q5 4 10 0" stroke="#7a1f2b" strokeWidth="2" fill="none" strokeLinecap="round" />}
-    </svg>
+    </motion.svg>
   );
 }

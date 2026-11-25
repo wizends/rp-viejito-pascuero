@@ -1,5 +1,6 @@
 import { clsx } from 'clsx';
 import { Bell, BellOff, ChevronRight, KeyRound, LayoutDashboard, LogOut, Mail, ShieldCheck, X } from 'lucide-react';
+import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from 'framer-motion';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { LIGHT_MODES, useLights } from '@/stores/lights';
@@ -7,6 +8,7 @@ import { useMusic } from '@/stores/music';
 import { SONGS } from '@/lib/music';
 import { PlugSwitch } from '@/components/ui/PlugSwitch';
 import { MusicPanel } from '@/components/ui/MusicControl';
+import { EASE_IN, EASE_OUT, cascade, fadeUp, lifecycle, pop } from '@/lib/motion';
 
 /**
  * Menú del celular y la tablet: una hoja que sube desde abajo (al alcance del pulgar)
@@ -16,18 +18,36 @@ import { MusicPanel } from '@/components/ui/MusicControl';
 export function MenuSheet({ open, onClose, user, onLogout }: { open: boolean; onClose: () => void; user: boolean; onLogout: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const { pathname } = useLocation();
+  const controls = useAnimationControls();
+  const reduced = useReducedMotion();
 
+  // abrir: la hoja sube (o baja, en tablet) y su contenido entra en cascada;
+  // cerrar: primero se despide la hoja y el fondo se aclara, recién entonces se cierra el <dialog>
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
+    const sheet = !window.matchMedia('(min-width: 640px)').matches;
+    const off = reduced ? { opacity: 0 } : sheet ? { y: '100%', opacity: 1 } : { y: -16, scale: 0.97, opacity: 0 };
+    let cancelled = false;
     if (open && !d.open) {
+      controls.set(off);
+      d.removeAttribute('data-cerrando');
       d.showModal();
       document.documentElement.style.overflow = 'hidden';
+      void controls.start({ y: 0, scale: 1, opacity: 1, transition: { duration: sheet ? 0.42 : 0.3, ease: EASE_OUT } });
     } else if (!open && d.open) {
-      d.close();
+      d.setAttribute('data-cerrando', '');
+      void controls.start({ ...off, transition: { duration: 0.22, ease: EASE_IN } }).then(() => {
+        if (cancelled) return;
+        d.close();
+        d.removeAttribute('data-cerrando');
+      });
+      document.documentElement.style.overflow = '';
     }
-    if (!open) document.documentElement.style.overflow = '';
-  }, [open]);
+    return () => {
+      cancelled = true;
+    };
+  }, [open, controls, reduced]);
 
   // al navegar, el menú se cierra
   useEffect(() => {
@@ -37,19 +57,29 @@ export function MenuSheet({ open, onClose, user, onLogout }: { open: boolean; on
 
   return (
     // el clic en el fondo es un atajo de mouse/dedo: con teclado, Escape cierra (nativo de <dialog>)
-    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
-    <dialog
+    <motion.dialog
       ref={ref}
+      animate={controls}
       aria-labelledby="menu-titulo"
       onClose={onClose}
-      onCancel={onClose}
+      onCancel={(e) => {
+        // Escape: se anima la salida en vez de cerrar de golpe
+        e.preventDefault();
+        onClose();
+      }}
       // tocar el fondo oscuro cierra
       onClick={(e) => e.target === e.currentTarget && onClose()}
       className="menu-hoja m-0 mt-auto border-0 max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-[1.75rem] bg-[#fbf6ec] p-0 text-tinta shadow-[0_-18px_40px_-12px_rgb(15_27_61/0.45)] backdrop:bg-[rgb(15_27_61/0.45)] sm:ml-auto sm:mr-4 sm:mt-24 sm:max-h-[calc(100dvh-7rem)] sm:w-[380px] sm:rounded-[1.75rem]"
     >
-      <div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
+      <motion.div
+        key={open ? 'abierto' : 'cerrado'}
+        initial="hidden"
+        animate={open ? 'shown' : 'hidden'}
+        variants={cascade(0.045, 0.08)}
+        className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3"
+      >
         <span aria-hidden="true" className="mx-auto mb-2 block h-1.5 w-12 rounded-full bg-[#d8c3a0] sm:hidden" />
-        <div className="flex items-center justify-between">
+        <motion.div variants={fadeUp} className="flex items-center justify-between">
           <h2 id="menu-titulo" className="font-cuento text-3xl text-rojo">
             Menú
           </h2>
@@ -61,19 +91,22 @@ export function MenuSheet({ open, onClose, user, onLogout }: { open: boolean; on
           >
             <X size={20} aria-hidden="true" />
           </button>
-        </div>
+        </motion.div>
 
-        <nav aria-label="Principal" className="mt-3">
-          <ul className="overflow-hidden rounded-2xl bg-white shadow-[0_6px_16px_-10px_rgb(74_46_30/0.5)]">
+        <motion.nav variants={fadeUp} aria-label="Principal" className="mt-3">
+          <motion.ul layout className="overflow-hidden rounded-2xl bg-white shadow-[0_6px_16px_-10px_rgb(74_46_30/0.5)]">
             <MenuLink to="/" end icon={<Mail size={20} aria-hidden="true" />} label="Escribir carta" hint="Para el Viejito Pascuero" />
-            {user ? (
-              <MenuLink to="/panel" icon={<LayoutDashboard size={20} aria-hidden="true" />} label="Panel de ayudantes" hint="Cartas, regalos y trayecto" />
-            ) : (
-              <MenuLink to="/entrar" icon={<KeyRound size={20} aria-hidden="true" />} label="Soy papá, mamá o tutor" hint="Entrar o crear tu credencial" />
-            )}
+            <AnimatePresence initial={false} mode="wait">
+              {user ? (
+                <MenuLink key="panel" to="/panel" icon={<LayoutDashboard size={20} aria-hidden="true" />} label="Panel de ayudantes" hint="Cartas, regalos y trayecto" />
+              ) : (
+                <MenuLink key="entrar" to="/entrar" icon={<KeyRound size={20} aria-hidden="true" />} label="Soy papá, mamá o tutor" hint="Entrar o crear tu credencial" />
+              )}
+            </AnimatePresence>
             <MenuLink to="/privacidad" icon={<ShieldCheck size={20} aria-hidden="true" />} label="Privacidad" hint="Cómo cuidamos las cartas" />
+            <AnimatePresence initial={false}>
             {user && (
-              <li>
+              <motion.li key="salir" {...lifecycle} variants={pop} layout>
                 <button
                   type="button"
                   onClick={onLogout}
@@ -82,25 +115,34 @@ export function MenuSheet({ open, onClose, user, onLogout }: { open: boolean; on
                   <LogOut size={20} aria-hidden="true" />
                   Salir
                 </button>
-              </li>
+              </motion.li>
             )}
-          </ul>
-        </nav>
+            </AnimatePresence>
+          </motion.ul>
+        </motion.nav>
 
-        <h3 className="mb-2 mt-6 font-display text-lg font-extrabold text-marino">Ambiente navideño</h3>
+        <motion.h3 variants={fadeUp} className="mb-2 mt-6 font-display text-lg font-extrabold text-marino">
+          Ambiente navideño
+        </motion.h3>
         <div className="space-y-3">
-          <Lights />
-          <MusicSection />
-          <BellsRow />
+          <motion.div variants={fadeUp}>
+            <Lights />
+          </motion.div>
+          <motion.div variants={fadeUp}>
+            <MusicSection />
+          </motion.div>
+          <motion.div variants={fadeUp}>
+            <BellsRow />
+          </motion.div>
         </div>
-      </div>
-    </dialog>
+      </motion.div>
+    </motion.dialog>
   );
 }
 
 function MenuLink({ to, end, icon, label, hint }: { to: string; end?: boolean; icon: ReactNode; label: string; hint: string }) {
   return (
-    <li className="border-t border-[#efe4cf] first:border-t-0">
+    <motion.li layout {...lifecycle} variants={pop} className="border-t border-[#efe4cf] first:border-t-0">
       <NavLink
         to={to}
         end={end}
@@ -122,7 +164,7 @@ function MenuLink({ to, end, icon, label, hint }: { to: string; end?: boolean; i
           </>
         )}
       </NavLink>
-    </li>
+    </motion.li>
   );
 }
 
@@ -138,7 +180,17 @@ function Lights() {
           <p id="menu-luces" className="font-extrabold text-marino">
             Luces del taller
           </p>
-          <p className="text-xs font-semibold text-tinta-suave">{on ? 'Encendidas' : 'Apagadas: mueve la palanca'}</p>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.p
+              key={on ? 'on' : 'off'}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
+              className="text-xs font-semibold text-tinta-suave"
+            >
+              {on ? 'Encendidas' : 'Apagadas: mueve la palanca'}
+            </motion.p>
+          </AnimatePresence>
         </div>
         <PlugSwitch leverOnly />
       </div>
@@ -153,11 +205,12 @@ function Lights() {
               aria-checked={selected}
               onClick={() => setMode(m.id)}
               className={clsx(
-                'min-h-[44px] rounded-xl px-2 py-1.5 text-xs font-extrabold leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oro',
-                selected ? 'bg-oro text-tinta' : 'bg-[#f6efe2] text-marino hover:bg-cielo-claro',
+                'relative min-h-[44px] rounded-xl bg-[#f6efe2] px-2 py-1.5 text-xs font-extrabold leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oro',
+                selected ? 'text-tinta' : 'text-marino hover:bg-cielo-claro',
               )}
             >
-              {m.label}
+              {selected && <motion.span layoutId="menu-luz-activa" className="absolute inset-0 rounded-xl bg-oro" transition={{ type: 'spring', stiffness: 420, damping: 32 }} aria-hidden="true" />}
+              <span className="relative">{m.label}</span>
             </button>
           );
         })}
@@ -174,7 +227,17 @@ function MusicSection() {
       <p id="menu-musica" className="font-extrabold text-marino">
         Música
       </p>
-      <p className="mb-2 text-xs font-semibold text-tinta-suave">{playing ? `Sonando: ${SONGS[index]!.title}` : 'Toca un villancico para escucharlo'}</p>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.p
+          key={playing ? `s${index}` : 'pausa'}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, transition: { duration: 0.1 } }}
+          className="mb-2 text-xs font-semibold text-tinta-suave"
+        >
+          {playing ? `Sonando: ${SONGS[index]!.title}` : 'Toca un villancico para escucharlo'}
+        </motion.p>
+      </AnimatePresence>
       <MusicPanel />
     </section>
   );
@@ -192,14 +255,28 @@ function BellsRow() {
       className="flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left shadow-[0_6px_16px_-10px_rgb(74_46_30/0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oro"
     >
       <span className={clsx('grid h-9 w-9 shrink-0 place-items-center rounded-full', audio ? 'bg-rojo text-white' : 'bg-[#f6efe2] text-marino')}>
-        {audio ? <Bell size={18} aria-hidden="true" /> : <BellOff size={18} aria-hidden="true" />}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={audio ? 'on' : 'off'}
+            initial={{ rotate: -30, scale: 0.6, opacity: 0 }}
+            animate={{ rotate: 0, scale: 1, opacity: 1 }}
+            exit={{ rotate: 30, scale: 0.6, opacity: 0, transition: { duration: 0.1 } }}
+            className="grid place-items-center"
+          >
+            {audio ? <Bell size={18} aria-hidden="true" /> : <BellOff size={18} aria-hidden="true" />}
+          </motion.span>
+        </AnimatePresence>
       </span>
       <span className="min-w-0 flex-1">
         <span className="block font-extrabold text-marino">Sonidos de campanitas</span>
         <span className="block text-xs font-semibold text-tinta-suave">Al encender las luces y en cada parada del trineo</span>
       </span>
       <span aria-hidden="true" className={clsx('relative h-7 w-12 shrink-0 rounded-full transition-colors', audio ? 'bg-muerdago' : 'bg-[#d8c3a0]')}>
-        <span className={clsx('absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-[left] duration-200', audio ? 'left-6' : 'left-1')} />
+        <motion.span
+          layout
+          transition={{ type: 'spring', stiffness: 520, damping: 32 }}
+          className={clsx('absolute top-1 h-5 w-5 rounded-full bg-white shadow', audio ? 'left-6' : 'left-1')}
+        />
       </span>
     </button>
   );

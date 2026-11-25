@@ -4,6 +4,7 @@ import { Gift, Plus, ShieldAlert, X } from 'lucide-react';
 import { useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { SealButton } from '@/components/ui/SealButton';
+import { Collapse } from '@/lib/motion';
 import { looksSensitive, writeLetterSchema, type WriteLetterValues } from './schemas';
 
 interface Props {
@@ -60,11 +61,11 @@ export function WriteLetterForm({ disabled, busy, onSubmit }: Props) {
           placeholder="Querido Viejito Pascuero: este año me porté…"
           className="mt-1 block w-full resize-y bg-transparent font-mano text-2xl leading-[2.25rem] text-noche placeholder:text-noche/35 focus:outline-none"
         />
-        {errors.mensaje && (
+        <Collapse show={!!errors.mensaje}>
           <p id="mensaje-err" className="text-sm font-bold text-rojo-baya">
-            {errors.mensaje.message}
+            {errors.mensaje?.message}
           </p>
-        )}
+        </Collapse>
 
         <p className="mt-4 font-mano text-3xl font-bold text-pino" id="deseos-label">
           Mi lista de deseos
@@ -82,14 +83,16 @@ export function WriteLetterForm({ disabled, busy, onSubmit }: Props) {
                 className="flex items-center gap-1 rounded-full bg-oro-suave py-1 pl-3 pr-1 font-mano text-xl text-tinta shadow-[0_2px_0_var(--canela),0_10px_18px_-8px_rgb(15_27_61/0.5)]"
               >
                 <Gift size={16} className="text-rojo-baya" aria-hidden="true" /> {f.value}
-                <button
+                <motion.button
                   type="button"
                   onClick={() => remove(i)}
                   aria-label={`Quitar ${f.value}`}
+                  whileHover={{ rotate: 90 }}
+                  whileTap={{ scale: 0.8 }}
                   className="rounded-full p-1 hover:bg-white/60"
                 >
                   <X size={14} />
-                </button>
+                </motion.button>
               </motion.li>
             ))}
           </AnimatePresence>
@@ -123,13 +126,13 @@ export function WriteLetterForm({ disabled, busy, onSubmit }: Props) {
         </div>
       </div>
 
-      {sensitive && (
+      <Collapse show={sensitive}>
         <p role="alert" className="flex items-start gap-2 rounded-xl bg-rojo/10 p-3 text-sm font-bold text-rojo-baya">
           <ShieldAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
           Parece que escribiste un teléfono, RUT, dirección o colegio. ¡El Viejito no lo necesita! Los duendes lo
           van a tapar igual, pero mejor bórralo.
         </p>
-      )}
+      </Collapse>
 
       <div className="flex flex-col items-center pb-8 pt-2">
         <SealButton label="Enviar al Polo Norte" busy={busy} disabled={disabled} />

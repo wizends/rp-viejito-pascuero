@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MotionConfig, motion } from 'framer-motion';
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { ApiError } from '@/lib/api';
@@ -26,15 +27,17 @@ const queryClient = new QueryClient({
 
 function PageFallback() {
   return (
-    <div className="grid min-h-[60vh] place-items-center px-6">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { delay: 0.15 } }} className="grid min-h-[60vh] place-items-center px-6">
       <SleighLoader progress={66} label="Abriendo la página" />
-    </div>
+    </motion.div>
   );
 }
 
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      {/* "reducir movimiento" del sistema: sin desplazamientos ni escalas, solo fundidos */}
+      <MotionConfig reducedMotion="user">
       <BrowserRouter>
         <SessionBootstrap />
         <Suspense fallback={<PageFallback />}>
@@ -66,6 +69,7 @@ export function App() {
           </Routes>
         </Suspense>
       </BrowserRouter>
+      </MotionConfig>
     </QueryClientProvider>
   );
 }

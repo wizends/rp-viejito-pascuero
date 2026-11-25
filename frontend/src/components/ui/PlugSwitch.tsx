@@ -1,4 +1,5 @@
 import { clsx } from 'clsx';
+import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 import { LIGHT_MODES, useLights } from '@/stores/lights';
 
@@ -38,18 +39,22 @@ export function PlugSwitch({ compact = false, leverOnly = false }: { compact?: b
         </span>
       </button>
       {compact && !leverOnly && (
-        <button
+        <motion.button
           type="button"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.85, rotate: 120 }}
           onClick={() => {
             const i = LIGHT_MODES.findIndex((m) => m.id === lastOnMode);
             setMode(LIGHT_MODES[(i + 1) % LIGHT_MODES.length]!.id);
           }}
           aria-label={`Modo de luces: ${LIGHT_MODES.find((m) => m.id === lastOnMode)?.label}. Cambiar modo`}
           title="Cambiar modo de luces"
-          className="grid h-11 w-11 place-items-center rounded-full bg-oro text-marino shadow-[0_6px_14px_-4px_rgb(224_165_58/0.8)] transition-transform duration-300 ease-rebote hover:scale-110 active:scale-90"
+          className="grid h-11 w-11 place-items-center rounded-full bg-oro text-marino shadow-[0_6px_14px_-4px_rgb(224_165_58/0.8)]"
         >
-          <Sparkles size={18} aria-hidden="true" />
-        </button>
+          <motion.span key={lastOnMode} initial={{ rotate: -90, scale: 0.5 }} animate={{ rotate: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 420, damping: 14 }} className="grid place-items-center">
+            <Sparkles size={18} aria-hidden="true" />
+          </motion.span>
+        </motion.button>
       )}
       {!compact && !leverOnly && (
         <div role="radiogroup" aria-label="Modo de las luces" className="flex gap-1">
@@ -64,13 +69,12 @@ export function PlugSwitch({ compact = false, leverOnly = false }: { compact?: b
                 onClick={() => setMode(m.id)}
                 title={m.label}
                 className={clsx(
-                  'rounded-full px-2.5 py-1 text-xs font-bold transition-all duration-200 ease-rebote',
-                  selected
-                    ? 'bg-oro text-tinta shadow-brillo'
-                    : 'bg-white text-marino shadow-[0_3px_8px_-4px_rgb(74_46_30/0.4)] hover:bg-cielo-claro',
+                  'relative rounded-full bg-white px-2.5 py-1 text-xs font-bold shadow-[0_3px_8px_-4px_rgb(74_46_30/0.4)] transition-colors duration-200',
+                  selected ? 'text-tinta' : 'text-marino hover:bg-cielo-claro',
                 )}
               >
-                {m.label}
+                {selected && <motion.span layoutId="modo-luces" className="absolute inset-0 rounded-full bg-oro shadow-brillo" transition={{ type: 'spring', stiffness: 420, damping: 32 }} aria-hidden="true" />}
+                <span className="relative">{m.label}</span>
               </button>
             );
           })}

@@ -7,6 +7,8 @@ import { MagicButton } from '@/components/ui/MagicButton';
 import { toast } from '@/components/ui/Toast';
 import { validateFile } from '@/features/letters/schemas';
 import { SantaSelfie } from '@/features/selfie/SantaSelfie';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Swap, fadeUp, lifecycle, pop } from '@/lib/motion';
 
 /** Lado mayor de la foto que se envía (el servidor tampoco guarda más). */
 const MAX_SIDE = 2400;
@@ -102,7 +104,9 @@ export function TreePhotoCard({ child, shipment }: { child: Child; shipment: Shi
             >
               {busy ? 'Subiendo…' : shipment.has_tree_photo ? 'Cambiar foto' : 'Subir foto del árbol'}
             </MagicButton>
+            <AnimatePresence initial={false}>
             {shipment.has_tree_photo && (
+              <motion.span key="borrar" {...lifecycle} variants={pop}>
               <MagicButton
                 size="sm"
                 variant="fantasma"
@@ -112,10 +116,13 @@ export function TreePhotoCard({ child, shipment }: { child: Child; shipment: Shi
               >
                 Borrar
               </MagicButton>
+              </motion.span>
             )}
+            </AnimatePresence>
           </div>
         </div>
 
+        <Swap id={shipment.has_tree_photo ? 'con-foto' : 'sin-foto'} variants={fadeUp}>
         {shipment.has_tree_photo ? (
           <div>
             <p className="mb-2 text-center text-xs font-extrabold uppercase tracking-wide text-tinta-suave">Así la verá {child.nickname}</p>
@@ -133,6 +140,7 @@ export function TreePhotoCard({ child, shipment }: { child: Child; shipment: Shi
             </span>
           </button>
         )}
+        </Swap>
       </div>
     </section>
   );

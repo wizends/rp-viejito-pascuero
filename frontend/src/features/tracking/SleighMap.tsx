@@ -3,6 +3,8 @@ import 'leaflet/dist/leaflet.css';
 import { useEffect, useMemo, useState } from 'react';
 import { MapContainer, Marker, Polygon, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Swap, fadeUp, lifecycle } from '@/lib/motion';
 import { POLO_NORTE, flightRoute } from '@/lib/time';
 import type { Stop } from '@/lib/types';
 import { SleighIcon, StopGlyph } from '@/components/ui/Icons';
@@ -199,22 +201,33 @@ export function SleighMap({ stops }: { stops: Stop[] }) {
       </MapContainer>
 
       {/* leyenda */}
+      <AnimatePresence>
       {route && (
-        <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-xl bg-crema/95 px-3 py-2 text-xs font-bold text-tinta shadow-papel">
+        <motion.div key="leyenda" {...lifecycle} variants={fadeUp} className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-xl bg-crema/95 px-3 py-2 text-xs font-bold text-tinta shadow-papel">
           <p className="flex items-center gap-2">
             <span className="inline-block h-1.5 w-6 rounded-full bg-oro" /> Recorrido
           </p>
           <p className="mt-1 flex items-center gap-2">
             <span className="inline-block w-6 border-t-[3px] border-dotted border-[#7a5236]" /> Por recorrer
           </p>
-          <p className="mt-1 text-tinta-suave">{route.departed ? '¡El trineo va en camino!' : 'El trineo espera en el Polo Norte.'}</p>
-        </div>
+          <Swap id={route.departed ? 'vuela' : 'espera'}>
+            <p className="mt-1 text-tinta-suave">{route.departed ? '¡El trineo va en camino!' : 'El trineo espera en el Polo Norte.'}</p>
+          </Swap>
+        </motion.div>
       )}
-      {geo.length === 0 && (
-        <p className="pointer-events-none absolute inset-x-6 bottom-6 z-[500] rounded-xl bg-crema/95 p-3 text-center text-sm font-bold text-marino">
-          Cuando las paradas tengan coordenadas, aquí verás volar el trineo.
-        </p>
-      )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {geo.length === 0 && (
+          <motion.p
+            key="sin-mapa"
+            {...lifecycle}
+            variants={fadeUp}
+            className="pointer-events-none absolute inset-x-6 bottom-6 z-[500] rounded-xl bg-crema/95 p-3 text-center text-sm font-bold text-marino"
+          >
+            Cuando las paradas tengan coordenadas, aquí verás volar el trineo.
+          </motion.p>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

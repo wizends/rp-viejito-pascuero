@@ -37,26 +37,39 @@ export function Toaster() {
         {items.map((t) => (
           <motion.div
             key={t.id}
+            layout
             initial={{ opacity: 0, y: 20, rotate: -3 }}
             animate={{ opacity: 1, y: 0, rotate: 0 }}
-            exit={{ opacity: 0, x: 40 }}
+            exit={{ opacity: 0, x: 60, transition: { duration: 0.2 } }}
             transition={{ type: 'spring', stiffness: 380, damping: 24 }}
             role={t.tone === 'error' ? 'alert' : 'status'}
             className={
               'papel-crema pointer-events-auto flex items-start gap-3 rounded-2xl border-2 p-3 pr-2 shadow-papel ' +
-              (t.tone === 'error' ? 'border-rojo' : t.tone === 'info' ? 'border-noche-600' : 'border-muerdago')
+              (t.tone === 'error' ? 'border-rojo' : t.tone === 'info' ? 'border-noche-600' : 'border-muerdago') +
+              ' relative overflow-hidden'
             }
           >
+            {/* cinta que se acorta: cuánto le queda al aviso */}
+            <motion.span
+              aria-hidden="true"
+              initial={{ scaleX: 1 }}
+              animate={{ scaleX: 0 }}
+              transition={{ duration: 5.2, ease: 'linear' }}
+              style={{ originX: 0 }}
+              className={'absolute inset-x-0 bottom-0 h-1 ' + (t.tone === 'error' ? 'bg-rojo' : t.tone === 'info' ? 'bg-noche-600' : 'bg-muerdago')}
+            />
             <Star className={t.tone === 'error' ? 'text-rojo' : 'text-canela'} size={20} aria-hidden="true" />
             <p className="flex-1 text-sm font-bold text-tinta">{t.text}</p>
-            <button
+            <motion.button
+              whileHover={{ rotate: 90 }}
+              whileTap={{ scale: 0.85 }}
               type="button"
               onClick={() => dismiss(t.id)}
               className="rounded-full p-1 text-tinta-suave hover:bg-kraft/40"
               aria-label="Cerrar aviso"
             >
               <X size={16} />
-            </button>
+            </motion.button>
           </motion.div>
         ))}
       </AnimatePresence>

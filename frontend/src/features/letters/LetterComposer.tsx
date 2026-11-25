@@ -9,6 +9,7 @@ import type { Letter } from '@/lib/types';
 import { useScene } from '@/stores/scene';
 import { useSession } from '@/stores/session';
 import { toast } from '@/components/ui/Toast';
+import { Swap, fadeUp } from '@/lib/motion';
 import { ChildPicker } from './ChildPicker';
 import { WriteLetterForm } from './WriteLetterForm';
 import { UploadLetterForm } from './UploadLetterForm';
@@ -78,19 +79,26 @@ export function LetterComposer({ reduced }: { reduced: boolean }) {
             aria-controls={`panel-${id}`}
             onClick={() => setTab(id)}
             className={clsx(
-              'inline-flex items-center gap-2 rounded-t-2xl border-2 border-b-0 px-4 py-2 font-display font-extrabold transition-all duration-200 ease-rebote',
+              'relative inline-flex items-center gap-2 rounded-t-2xl border-2 border-b-0 px-4 py-2 font-display font-extrabold transition-all duration-200 ease-rebote',
               tab === id
-                ? 'translate-y-0 border-kraft-oscuro bg-crema text-rojo-baya'
+                ? 'translate-y-0 border-kraft-oscuro text-rojo-baya'
                 : 'translate-y-1 border-transparent bg-kraft-oscuro/30 text-tinta hover:-translate-y-0',
             )}
           >
-            {icon}
-            {label}
+            {/* la pestaña de papel se desliza a la opción elegida */}
+            {tab === id && (
+              <motion.span layoutId="pestana-carta" className="absolute inset-0 -z-0 rounded-t-[14px] bg-crema" transition={{ type: 'spring', stiffness: 420, damping: 34 }} aria-hidden="true" />
+            )}
+            <span className="relative inline-flex items-center gap-2">
+              {icon}
+              {label}
+            </span>
           </button>
         ))}
       </div>
 
       <div className="rounded-b-2xl rounded-tr-2xl border-2 border-kraft-oscuro bg-crema/60 p-3 sm:p-5">
+        <Swap id={locked ? 'bloqueada' : user ? 'familia' : 'cargando'} variants={fadeUp}>
         {locked ? (
           <div className="flex flex-col items-start gap-3 rounded-2xl border-2 border-dashed border-rojo/50 bg-white/70 p-4 sm:flex-row sm:items-center">
             <Lock className="shrink-0 text-rojo" aria-hidden="true" />
@@ -110,6 +118,7 @@ export function LetterComposer({ reduced }: { reduced: boolean }) {
         ) : user ? (
           <ChildPicker children={children.data ?? []} value={effectiveChild} onChange={setChildId} loading={children.isLoading} />
         ) : null}
+        </Swap>
 
         <AnimatePresence mode="wait" initial={false}>
           <motion.div

@@ -14,6 +14,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { FlipClock } from './FlipClock';
 import { Timeline } from './Timeline';
 import { StagePanel } from './StagePanel';
+import { Collapse, Swap, cascade, fadeUp, pop } from '@/lib/motion';
 import { SantaSelfie } from '@/features/selfie/SantaSelfie';
 
 const SleighMap = lazy(() => import('./SleighMap').then((m) => ({ default: m.SleighMap })));
@@ -75,13 +76,19 @@ export default function TrackingPage() {
     }
   }, { public: true });
 
-  if (q.isLoading) return <p className="p-10 text-center font-bold text-marino">Buscando el trineo…</p>;
-  if (q.isError || !q.data)
+  // la raíz es siempre <Swap>: así "buscando…" se despide y el viaje entra (o el error)
+  if (q.isLoading || q.isError || !q.data)
     return (
-      <div className="mx-auto max-w-lg p-10 text-center">
-        <p className="font-cuento text-4xl text-rojo">Código mágico no encontrado</p>
-        <p className="mt-2 font-semibold text-tinta-suave">Pídele a tu papá, mamá o tutor que te comparta el enlace otra vez.</p>
-      </div>
+      <Swap id={q.isLoading ? 'cargando' : 'error'} variants={fadeUp}>
+        {q.isLoading ? (
+          <p className="p-10 text-center font-bold text-marino">Buscando el trineo…</p>
+        ) : (
+          <div className="mx-auto max-w-lg p-10 text-center">
+            <p className="font-cuento text-4xl text-rojo">Código mágico no encontrado</p>
+            <p className="mt-2 font-semibold text-tinta-suave">Pídele a tu papá, mamá o tutor que te comparta el enlace otra vez.</p>
+          </div>
+        )}
+      </Swap>
     );
 
   const t = q.data;
@@ -91,21 +98,29 @@ export default function TrackingPage() {
   const selected = picked ?? live;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      <header className="flex flex-col items-center gap-2 text-center">
-        <Avatar id={t.avatar} size={72} />
-        <h1 className="font-cuento text-4xl text-marino sm:text-5xl">¡Hola, {t.nickname}!</h1>
-        <p className="font-bold text-tinta-suave">Así va el viaje de tu regalo:</p>
-      </header>
+    <Swap id="viaje" variants={fadeUp}>
+    <motion.div initial="hidden" animate="shown" variants={cascade(0.09)} className="mx-auto max-w-6xl px-4 py-6">
+      <motion.header variants={cascade(0.08)} className="flex flex-col items-center gap-2 text-center">
+        <motion.div variants={pop}>
+          <Avatar id={t.avatar} size={72} />
+        </motion.div>
+        <motion.h1 variants={fadeUp} className="font-cuento text-4xl text-marino sm:text-5xl">
+          ¡Hola, {t.nickname}!
+        </motion.h1>
+        <motion.p variants={fadeUp} className="font-bold text-tinta-suave">
+          Así va el viaje de tu regalo:
+        </motion.p>
+      </motion.header>
 
-      <section aria-labelledby="cuenta" className="mt-6 rounded-galleta bg-white p-6 text-center shadow-papel">
+      <motion.section variants={fadeUp} aria-labelledby="cuenta" className="mt-6 rounded-galleta bg-white p-6 text-center shadow-papel">
         <h2 id="cuenta" className="mb-4 text-2xl text-marino">
           El Viejito Pascuero llega en…
         </h2>
         <FlipClock c={c} />
-      </section>
+      </motion.section>
 
-      {t.selfie && (
+      {/* la selfie aparece en vivo cuando el Viejito deja el regalo */}
+      <Collapse show={t.selfie}>
         <section aria-labelledby="selfie" className="mt-6 rounded-galleta bg-noche-700 px-4 py-8 text-center shadow-papel sm:px-8">
           <h2 id="selfie" className="font-cuento text-4xl text-oro-suave sm:text-5xl">
             ¡El Viejito Pascuero estuvo aquí!
@@ -113,15 +128,18 @@ export default function TrackingPage() {
           <p className="mx-auto mt-2 max-w-lg font-bold text-hielo">Antes de seguir su viaje se sacó una selfie con tu árbol. ¡Mira debajo, tu regalo te espera!</p>
           <SantaSelfie className="mt-6" photo={selfie.data} when={deliveredAt(t.stops)} caption={`Para ${t.nickname}, con cariño`} />
         </section>
-      )}
+      </Collapse>
 
-      {t.stops.length > 0 && <StagePanel stops={t.stops} current={current} selected={selected} onSelect={setPicked} />}
+      <Collapse show={t.stops.length > 0}>
+        <StagePanel stops={t.stops} current={current} selected={selected} onSelect={setPicked} />
+      </Collapse>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_1.3fr]">
+      <motion.div variants={fadeUp} className="mt-8 grid gap-8 lg:grid-cols-[1fr_1.3fr]">
         <section aria-labelledby="paradas">
           <h2 id="paradas" className="mb-4 text-2xl text-marino">
             Paradas
           </h2>
+          <Swap id={t.stops.length ? 'paradas' : 'sin-paradas'} variants={fadeUp}>
           {t.stops.length ? <Timeline
               stops={t.stops}
               current={current}
@@ -132,16 +150,19 @@ export default function TrackingPage() {
                 document.getElementById('etapa')?.closest('section')?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' });
               }}
             /> : <p className="font-semibold text-tinta-suave">Los duendes aún están planeando la ruta.</p>}
+          </Swap>
         </section>
         <section aria-labelledby="mapa">
           <h2 id="mapa" className="mb-4 text-2xl text-marino">
             ¿Dónde está el trineo?
           </h2>
-          <Suspense fallback={<div className="h-[420px] rounded-[1.6rem] bg-white" />}>
-            <SleighMap stops={t.stops} />
+          <Suspense fallback={<div className="h-[420px] animate-pulse rounded-[1.6rem] bg-white" />}>
+            <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}>
+              <SleighMap stops={t.stops} />
+            </motion.div>
           </Suspense>
         </section>
-      </div>
+      </motion.div>
 
       <AnimatePresence>
         {celebrate && (
@@ -161,7 +182,8 @@ export default function TrackingPage() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
+    </Swap>
   );
 }
 

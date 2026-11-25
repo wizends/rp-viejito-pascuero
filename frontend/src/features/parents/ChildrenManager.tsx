@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { clsx } from 'clsx';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Collapse, Swap, fade, fadeUp, lifecycle, listItem } from '@/lib/motion';
 import { api } from '@/lib/api';
 import { AVATARS, type Avatar as AvatarId, type Child } from '@/lib/types';
 import { Avatar } from '@/components/ui/Avatar';
@@ -31,10 +33,13 @@ export function ChildrenManager({ children, selected, onSelect, loading }: Props
   return (
     <div className="papel-kraft rounded-galleta p-4 text-tinta shadow-papel">
       <h2 className="font-display text-xl">Mis duendecitos</h2>
-      {loading && <p className="mt-2 text-sm">Cargando…</p>}
-      <ul className="mt-3 space-y-2">
+      <Collapse show={loading}>
+        <p className="mt-2 text-sm">Cargando…</p>
+      </Collapse>
+      <motion.ul layout className="mt-3 space-y-2">
+        <AnimatePresence initial={false}>
         {children.map((c) => (
-          <li key={c.id}>
+          <motion.li key={c.id} layout {...lifecycle} variants={listItem}>
             <div
               className={clsx(
                 'flex items-center gap-2 rounded-2xl border-2 bg-crema/80 p-1.5 transition-all duration-200 ease-rebote',
@@ -62,16 +67,19 @@ export function ChildrenManager({ children, selected, onSelect, loading }: Props
                 <Trash2 size={16} />
               </button>
             </div>
-          </li>
+          </motion.li>
         ))}
-      </ul>
-      {editing ? (
-        <ChildForm child={editing === 'new' ? null : editing} onDone={(id) => (setEditing(null), id && onSelect(id))} />
-      ) : (
-        <MagicButton size="sm" variant="pino" className="mt-3" icon={<Plus size={16} aria-hidden="true" />} onClick={() => setEditing('new')}>
-          Agregar niño o niña
-        </MagicButton>
-      )}
+        </AnimatePresence>
+      </motion.ul>
+      <Swap id={editing ? (editing === 'new' ? 'nuevo' : editing.id) : 'boton'} variants={editing ? fadeUp : fade}>
+        {editing ? (
+          <ChildForm child={editing === 'new' ? null : editing} onDone={(id) => (setEditing(null), id && onSelect(id))} />
+        ) : (
+          <MagicButton size="sm" variant="pino" className="mt-3" icon={<Plus size={16} aria-hidden="true" />} onClick={() => setEditing('new')}>
+            Agregar niño o niña
+          </MagicButton>
+        )}
+      </Swap>
     </div>
   );
 }
@@ -113,9 +121,18 @@ function ChildForm({ child, onDone }: { child: Child | null; onDone: (id?: strin
       </p>
       <div role="radiogroup" aria-labelledby="cf-av" className="flex flex-wrap gap-1.5">
         {AVATARS.map((a) => (
-          <button key={a} type="button" role="radio" aria-checked={avatar === a} onClick={() => setAvatar(a)} className={clsx('rounded-full', avatar === a && 'ring-4 ring-oro')}>
+          <motion.button
+            key={a}
+            type="button"
+            role="radio"
+            aria-checked={avatar === a}
+            onClick={() => setAvatar(a)}
+            animate={{ scale: avatar === a ? 1.1 : 1 }}
+            whileTap={{ scale: 0.9 }}
+            className={clsx('rounded-full', avatar === a && 'ring-4 ring-oro')}
+          >
             <Avatar id={a} size={36} />
-          </button>
+          </motion.button>
         ))}
       </div>
       <div className="flex gap-2 pt-1">

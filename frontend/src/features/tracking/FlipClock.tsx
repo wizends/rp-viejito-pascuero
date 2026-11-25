@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Gift } from 'lucide-react';
 import { useReducedMotion } from '@/lib/useReducedMotion';
 import { countdownLabel, type Countdown } from '@/lib/time';
+import { Swap, pop } from '@/lib/motion';
 
 function FlipDigit({ value }: { value: string }) {
   const reduced = useReducedMotion();
@@ -47,6 +48,7 @@ export function FlipClock({ c }: { c: Countdown }) {
         {/* se anuncia solo el texto en minutos, no cada segundo */}
         {countdownLabel({ ...c, seconds: 0 })}
       </p>
+      <Swap id={c.done ? 'llego' : 'cuenta'} variants={pop}>
       {c.done ? (
         <p className="inline-flex items-center gap-3 font-cuento text-5xl text-rojo">¡Ya llegó! <Gift size={44} aria-hidden="true" /></p>
       ) : (
@@ -62,6 +64,7 @@ export function FlipClock({ c }: { c: Countdown }) {
           </div>
         </div>
       )}
+      </Swap>
     </div>
   );
 }

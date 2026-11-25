@@ -3,6 +3,8 @@ import { Check, Gift, Image as ImageIcon, Lock, Pencil, Sparkles, Trash2, Triang
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { clsx } from 'clsx';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Collapse, Swap, cascade, fade, fadeUp, lifecycle, listItem, pop } from '@/lib/motion';
 import { api } from '@/lib/api';
 import type { GiftInput, Letter, LetterStatus } from '@/lib/types';
 import { MagicButton } from '@/components/ui/MagicButton';
@@ -23,20 +25,26 @@ const METODO: Record<string, string> = {
 
 export function LettersList({ childId }: { childId: string }) {
   const q = useQuery({ queryKey: ['letters', childId], queryFn: () => api.letters(childId) });
-  if (q.isLoading) return <p className="font-bold text-marino">Buscando cartas en el buzón…</p>;
-  if (!q.data?.length)
-    return (
-      <div className="papel-crema rounded-galleta p-8 text-center text-tinta shadow-papel">
-        <p className="font-cuento text-3xl text-rojo-baya">El buzón está vacío</p>
-        <p className="mt-2 font-semibold">Cuando llegue una carta, aparecerá aquí con su transcripción.</p>
-      </div>
-    );
+  const state = q.isLoading ? 'cargando' : q.data?.length ? 'lista' : 'vacio';
   return (
-    <ul className="space-y-4">
-      {q.data.map((l) => (
-        <LetterCard key={`${l.id}-${l.status}`} letter={l} />
-      ))}
-    </ul>
+    <Swap id={state} variants={state === 'cargando' ? fade : fadeUp}>
+      {state === 'cargando' ? (
+        <p className="font-bold text-marino">Buscando cartas en el buzón…</p>
+      ) : state === 'vacio' ? (
+        <div className="papel-crema rounded-galleta p-8 text-center text-tinta shadow-papel">
+          <p className="font-cuento text-3xl text-rojo-baya">El buzón está vacío</p>
+          <p className="mt-2 font-semibold">Cuando llegue una carta, aparecerá aquí con su transcripción.</p>
+        </div>
+      ) : (
+        <motion.ul initial="hidden" animate="shown" variants={cascade(0.07)} className="space-y-4">
+          <AnimatePresence>
+            {q.data!.map((l) => (
+              <LetterCard key={`${l.id}-${l.status}`} letter={l} />
+            ))}
+          </AnimatePresence>
+        </motion.ul>
+      )}
+    </Swap>
   );
 }
 
@@ -69,9 +77,14 @@ function LetterCard({ letter }: { letter: Letter }) {
   };
 
   return (
-    <li className="papel-crema overflow-hidden rounded-[1.4rem] text-tinta shadow-papel">
+    <motion.li layout variants={listItem} exit="gone" className="papel-crema overflow-hidden rounded-[1.4rem] text-tinta shadow-papel">
       <div className="flex flex-wrap items-center gap-2 border-b-2 border-dashed border-marino/20 px-4 py-3">
-        <span className={clsx('rounded-full px-3 py-0.5 text-xs font-extrabold', st.cls)}>{st.label}</span>
+        {/* el estado salta al cambiar (recibida → leyendo → ¡leída!) */}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span key={letter.status} {...lifecycle} variants={pop} className={clsx('rounded-full px-3 py-0.5 text-xs font-extrabold', st.cls)}>
+            {st.label}
+          </motion.span>
+        </AnimatePresence>
         <span className="text-xs font-bold text-tinta-suave">
           {new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Santiago' }).format(new Date(letter.created_at))}
           {letter.metodo ? ` · ${METODO[letter.metodo] ?? letter.metodo}` : ''}
@@ -107,25 +120,19 @@ function LetterCard({ letter }: { letter: Letter }) {
 
       <div className="grid gap-4 p-4 md:grid-cols-[1fr_240px]">
         <div>
-          {letter.status === 'necesita_ayuda' && (
+          <Collapse show={letter.status === 'necesita_ayuda'}>
             <p className="mb-3 flex items-start gap-2 rounded-xl bg-rojo/10 p-3 text-sm font-bold text-rojo-baya">
               <TriangleAlert size={18} className="shrink-0" aria-hidden="true" />
               Los duendes no lograron leer esta letra. ¿Nos ayudas a transcribirla?
             </p>
-          )}
-          {letter.source === 'foto' && !letter.texto_original && letter.status !== 'necesita_ayuda' && (
+          </Collapse>
+          <Collapse show={letter.source === 'foto' && !letter.texto_original && letter.status !== 'necesita_ayuda'}>
             <p className="mb-3 rounded-xl bg-hielo/60 p-3 text-sm font-bold text-noche">
               Llegó como foto. Si quieres, transcríbela con el lápiz para armar la lista de regalos.
             </p>
-          )}
-          {letter.has_image && (
-            <img
-              src={`/api/letters/${letter.id}/image`}
-              alt="Foto de la carta enviada"
-              className="mb-3 max-h-80 w-full rounded-xl object-contain ring-1 ring-marino/20"
-              loading="lazy"
-            />
-          )}
+          </Collapse>
+          {letter.has_image && <LetterPhoto id={letter.id} />}
+          <Swap id={editing ? 'editando' : 'leyendo'} variants={fadeUp}>
           {editing ? (
             <div>
               <label htmlFor={`t-${letter.id}`} className="text-sm font-extrabold">
@@ -149,12 +156,13 @@ function LetterCard({ letter }: { letter: Letter }) {
               {letter.texto_normalizado || letter.texto_original || <span className="text-tinta-suave">(sin texto aún)</span>}
             </p>
           )}
-          {letter.texto_original && letter.texto_original !== letter.texto_normalizado && !editing && (
+          </Swap>
+          <Collapse show={!!letter.texto_original && letter.texto_original !== letter.texto_normalizado && !editing}>
             <details className="mt-3 text-sm">
               <summary className="cursor-pointer font-bold text-tinta-suave">Ver ortografía original</summary>
               <p className="mt-1 whitespace-pre-wrap font-mano text-xl">{letter.texto_original}</p>
             </details>
-          )}
+          </Collapse>
         </div>
 
         <div>
@@ -162,17 +170,25 @@ function LetterCard({ letter }: { letter: Letter }) {
             <Sparkles size={16} className="text-canela" aria-hidden="true" /> Lista de regalos
           </p>
           <p className="text-xs text-tinta-suave">Marca los que el Viejito va a traer.</p>
-          <ul className="mt-2 space-y-1.5">
+          <motion.ul layout className="mt-2 space-y-1.5">
+            <AnimatePresence initial={false}>
             {gifts.map((g, i) => (
-              <li key={`${g.nombre}-${i}`}>
+              <motion.li key={`${g.nombre}-${i}`} layout {...lifecycle} variants={listItem}>
                 <label className="flex cursor-pointer items-center gap-2 rounded-xl bg-white/70 px-2 py-1.5 text-sm font-bold">
                   <input type="checkbox" checked={g.marcado} onChange={() => toggleGift(i)} className="h-4 w-4 accent-[var(--rojo-pascuero)]" />
-                  <span className={clsx(g.marcado && 'text-pino')}>{g.nombre}</span>
-                  {g.marcado && <Gift size={14} className="text-rojo" aria-hidden="true" />}
+                  <span className={clsx('transition-colors', g.marcado && 'text-pino')}>{g.nombre}</span>
+                  <AnimatePresence initial={false}>
+                    {g.marcado && (
+                      <motion.span key="regalo" {...lifecycle} variants={pop} className="grid place-items-center">
+                        <Gift size={14} className="text-rojo" aria-hidden="true" />
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                 </label>
-              </li>
+              </motion.li>
             ))}
-          </ul>
+            </AnimatePresence>
+          </motion.ul>
           <form
             className="mt-2 flex gap-1"
             onSubmit={(e) => {
@@ -195,6 +211,23 @@ function LetterCard({ letter }: { letter: Letter }) {
           </form>
         </div>
       </div>
-    </li>
+    </motion.li>
+  );
+}
+
+/** La foto de la carta aparece con un fundido cuando terminó de cargar (no a medio dibujar). */
+function LetterPhoto({ id }: { id: string }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <motion.img
+      src={`/api/letters/${id}/image`}
+      alt="Foto de la carta enviada"
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={loaded ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.98 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      onLoad={() => setLoaded(true)}
+      className="mb-3 max-h-80 w-full rounded-xl object-contain ring-1 ring-marino/20"
+      loading="lazy"
+    />
   );
 }

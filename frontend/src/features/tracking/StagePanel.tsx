@@ -5,6 +5,7 @@ import { formatDateTime } from '@/lib/time';
 import type { Stop } from '@/lib/types';
 import { useReducedMotion } from '@/lib/useReducedMotion';
 import { StageScene } from './StageScene';
+import { Collapse, lifecycle, pop } from '@/lib/motion';
 
 type StageState = 'hecha' | 'ahora' | 'pronto';
 
@@ -64,11 +65,24 @@ export function StagePanel({
             Etapa {selected + 1} de {stops.length}
           </p>
           <div aria-live="polite">
-            <span className={clsx('inline-block rounded-full px-3 py-0.5 text-xs font-extrabold', CHIP[state].cls)}>{CHIP[state].text}</span>
-            <h2 id="etapa" className="mt-2 font-cuento text-3xl leading-tight text-rojo sm:text-4xl">
-              {stop.nombre}
-            </h2>
-            {stop.descripcion && <p className="mt-1 font-semibold text-tinta-suave">{stop.descripcion}</p>}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span key={`${stop.id}-${state}`} {...lifecycle} variants={pop} className={clsx('inline-block origin-left rounded-full px-3 py-0.5 text-xs font-extrabold', CHIP[state].cls)}>
+                {CHIP[state].text}
+              </motion.span>
+            </AnimatePresence>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={stop.id}
+                initial={{ opacity: 0, x: 16 }}
+                animate={{ opacity: 1, x: 0, transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } }}
+                exit={{ opacity: 0, x: -12, transition: { duration: 0.15 } }}
+              >
+                <h2 id="etapa" className="mt-2 font-cuento text-3xl leading-tight text-rojo sm:text-4xl">
+                  {stop.nombre}
+                </h2>
+                {stop.descripcion && <p className="mt-1 font-semibold text-tinta-suave">{stop.descripcion}</p>}
+              </motion.div>
+            </AnimatePresence>
             <p className="mt-1 text-sm font-bold text-tinta-suave">
               {stop.completed_at ? `Listo: ${formatDateTime(stop.completed_at)}` : stop.eta ? `Estimado: ${formatDateTime(stop.eta)}` : ''}
             </p>
@@ -89,14 +103,16 @@ export function StagePanel({
                 const st = stageState(stops, i, current);
                 return (
                   <li key={s.id}>
-                    <button
+                    <motion.button
                       type="button"
                       onClick={() => onSelect(i)}
                       aria-label={`Ver etapa ${i + 1}: ${s.nombre}`}
                       aria-current={i === selected ? 'step' : undefined}
+                      animate={{ width: i === selected ? 28 : 12 }}
+                      whileHover={{ scale: 1.2 }}
+                      transition={{ type: 'spring', stiffness: 420, damping: 28 }}
                       className={clsx(
-                        'block h-3 rounded-full transition-all',
-                        i === selected ? 'w-7' : 'w-3',
+                        'block h-3 rounded-full transition-colors',
                         st === 'hecha' ? 'bg-muerdago' : st === 'ahora' ? 'bg-oro' : 'bg-[#d8c3a0]',
                       )}
                     />
@@ -114,11 +130,11 @@ export function StagePanel({
               <ChevronRight size={20} />
             </button>
           </div>
-          {selected !== live && (
-            <button type="button" onClick={() => onSelect(null)} className="inline-flex items-center gap-1.5 self-center text-sm font-extrabold text-pino underline-offset-4 hover:underline">
+          <Collapse show={selected !== live} className="self-center">
+            <button type="button" onClick={() => onSelect(null)} className="inline-flex items-center gap-1.5 text-sm font-extrabold text-pino underline-offset-4 hover:underline">
               <Locate size={16} aria-hidden="true" /> Volver a la etapa actual
             </button>
-          )}
+          </Collapse>
         </div>
       </div>
     </section>

@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { clsx } from 'clsx';
@@ -7,6 +8,7 @@ import { AVATARS, type Avatar as AvatarId, type Child } from '@/lib/types';
 import { Avatar } from '@/components/ui/Avatar';
 import { MagicButton } from '@/components/ui/MagicButton';
 import { toast } from '@/components/ui/Toast';
+import { Collapse, lifecycle, listItem, pop } from '@/lib/motion';
 
 interface Props {
   children: Child[];
@@ -22,31 +24,44 @@ export function ChildPicker({ children, value, onChange, loading }: Props) {
   return (
     <fieldset>
       <legend className="font-display text-lg font-extrabold">¿Quién escribe la carta?</legend>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <motion.div layout className="mt-2 flex flex-wrap gap-2">
+        <AnimatePresence initial={false} mode="popLayout">
         {children.map((c) => (
-          <label
+          <motion.label
+            layout
+            {...lifecycle}
+            variants={listItem}
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.95 }}
             key={c.id}
             className={clsx(
               'flex cursor-pointer items-center gap-2 rounded-2xl border-2 bg-white/80 py-1 pl-1 pr-4 font-bold transition-all duration-200 ease-rebote has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-oro',
-              value === c.id ? 'scale-105 border-rojo shadow-brillo' : 'border-marino/20 hover:-translate-y-0.5',
+              value === c.id ? 'border-rojo shadow-brillo' : 'border-marino/20',
             )}
           >
             <input type="radio" name="child" value={c.id} checked={value === c.id} onChange={() => onChange(c.id)} className="sr-only" />
             <Avatar id={c.avatar} size={40} />
             {c.nickname}
-          </label>
+          </motion.label>
         ))}
         {!adding && (
-          <button
+          <motion.button
+            key="agregar"
+            layout
+            {...lifecycle}
+            variants={pop}
             type="button"
             onClick={() => setAdding(true)}
             className="inline-flex items-center gap-1 rounded-2xl border-2 border-dashed border-kraft-oscuro px-3 py-2 text-sm font-extrabold text-tinta-suave transition-colors hover:border-rojo hover:text-rojo"
           >
             <Plus size={16} aria-hidden="true" /> {empty ? 'Agregar al primer niño o niña' : 'Agregar otro'}
-          </button>
+          </motion.button>
         )}
-      </div>
-      {adding && <QuickChild onDone={(id) => (setAdding(false), id && onChange(id))} />}
+        </AnimatePresence>
+      </motion.div>
+      <Collapse show={adding}>
+        <QuickChild onDone={(id) => (setAdding(false), id && onChange(id))} />
+      </Collapse>
     </fieldset>
   );
 }
@@ -82,16 +97,19 @@ function QuickChild({ onDone }: { onDone: (id?: string) => void }) {
       </p>
       <div role="radiogroup" aria-labelledby="avatar-label" className="mt-1 flex flex-wrap gap-2">
         {AVATARS.map((a) => (
-          <button
+          <motion.button
             key={a}
             type="button"
             role="radio"
+            animate={{ scale: avatar === a ? 1.1 : 1 }}
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.9 }}
             aria-checked={avatar === a}
             onClick={() => setAvatar(a)}
-            className={clsx('rounded-full p-0.5 transition-transform duration-200 ease-rebote', avatar === a ? 'scale-110 ring-4 ring-oro' : 'hover:scale-105')}
+            className={clsx('rounded-full p-0.5 transition-transform duration-200 ease-rebote', avatar === a ? 'ring-4 ring-oro' : '')}
           >
             <Avatar id={a} size={44} />
-          </button>
+          </motion.button>
         ))}
       </div>
       <div className="mt-3 flex gap-2">

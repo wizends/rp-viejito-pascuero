@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
+import { Collapse, cascade, fadeUp } from '@/lib/motion';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -54,15 +55,15 @@ export default function LoginPage({ mode }: { mode: 'login' | 'register' }) {
 
   return (
     <div className="mx-auto grid max-w-5xl items-center gap-10 px-4 py-10 md:grid-cols-[1fr_1.1fr]">
-      <div className="text-center md:text-left">
-        <h1 className="text-4xl text-marino sm:text-5xl">
+      <motion.div initial="hidden" animate="shown" variants={cascade(0.1)} className="text-center md:text-left">
+        <motion.h1 variants={fadeUp} className="text-4xl text-marino sm:text-5xl">
           {isRegister ? 'Saca tu credencial de ayudante' : 'Muestra tu credencial de ayudante'}
-        </h1>
-        <p className="mt-4 max-w-[52ch] text-lg font-semibold text-tinta-suave">
+        </motion.h1>
+        <motion.p variants={fadeUp} className="mt-4 max-w-[52ch] text-lg font-semibold text-tinta-suave">
           Es para papás, mamás y tutores. Con ella guardas las cartas de tus niños, revisas lo que pidieron y armas el viaje del regalo hasta el
           árbol, parada por parada.
-        </p>
-      </div>
+        </motion.p>
+      </motion.div>
 
       <motion.form
         onSubmit={onSubmit}
@@ -91,9 +92,9 @@ export default function LoginPage({ mode }: { mode: 'login' | 'register' }) {
             </svg>
           </div>
           <div className="space-y-3">
-            {isRegister && (
+            <Collapse show={isRegister}>
               <Field label="Tu nombre" autoComplete="name" error={errors.display_name?.message} {...register('display_name')} />
-            )}
+            </Collapse>
             <Field label="Correo" type="email" autoComplete="email" error={errors.email?.message} {...register('email')} />
             <Field
               label="Contraseña"
@@ -128,11 +129,16 @@ export default function LoginPage({ mode }: { mode: 'login' | 'register' }) {
           </p>
         </div>
         {/* sello */}
-        <div aria-hidden="true" className="absolute right-4 top-6 hidden h-20 w-20 rotate-12 place-items-center rounded-full border-4 border-double border-oro-suave/80 text-center font-cuento text-xs leading-tight text-oro-suave sm:grid">
+        <motion.div
+          aria-hidden="true"
+          initial={{ scale: 2.2, opacity: 0, rotate: -20 }}
+          animate={{ scale: 1, opacity: 1, rotate: 12 }}
+          transition={{ delay: 0.55, type: 'spring', stiffness: 380, damping: 14 }}
+          className="absolute right-4 top-6 hidden h-20 w-20 place-items-center rounded-full border-4 border-double border-oro-suave/80 text-center font-cuento text-xs leading-tight text-oro-suave sm:grid">
           Aprobado
           <br />
           por el Viejito
-        </div>
+        </motion.div>
       </motion.form>
     </div>
   );

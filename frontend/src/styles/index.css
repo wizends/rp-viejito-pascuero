@@ -371,27 +371,26 @@
   }
 }
 
-/* menú del celular: la hoja sube desde abajo (en tablet aparece arriba a la derecha) */
-.menu-hoja[open] {
-  animation: menu-sube 0.34s cubic-bezier(0.22, 1, 0.36, 1);
-}
+/* menú del celular: la hoja la anima Framer Motion; el fondo oscuro entra y sale con CSS */
 .menu-hoja[open]::backdrop {
   animation: menu-fondo 0.25s ease-out;
 }
-@keyframes menu-sube {
-  from {
-    transform: translateY(28px);
-    opacity: 0;
-  }
+.menu-hoja[data-cerrando]::backdrop {
+  animation: menu-fondo-sale 0.22s ease-in forwards;
 }
 @keyframes menu-fondo {
   from {
     opacity: 0;
   }
 }
+@keyframes menu-fondo-sale {
+  to {
+    opacity: 0;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .menu-hoja[open],
-  .menu-hoja[open]::backdrop {
-    animation: none;
+  .menu-hoja[open]::backdrop,
+  .menu-hoja[data-cerrando]::backdrop {
+    animation-duration: 0.01s;
   }
 }

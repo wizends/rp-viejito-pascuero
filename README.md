@@ -194,6 +194,23 @@ El botón verde con la nota musical, en el encabezado, pone villancicos tocados 
 - **En segundo plano:** al cambiar de pestaña se pausa y retoma al volver.
 - **Tests:** comprueban que cada melodía tenga compases completos y un acorde por compás, para atrapar errores al transcribirlas.
 
+### Animaciones (Framer Motion)
+
+Toda la interfaz usa un mismo lenguaje de movimiento, definido en `frontend/src/lib/motion.ts` (curvas, duraciones y variantes) y `frontend/src/components/ui/MotionBlocks.tsx` (componentes).
+
+- **Aparecer, cambiar y desaparecer:**
+  - Al aparecer, los elementos suben un poco con un frenado suave.
+  - Al irse, se despiden más rápido.
+  - Las listas entran en cascada y sus elementos se pliegan al quitarlos.
+- **Mostrar y ocultar:** avisos, errores, formularios y paneles se despliegan con altura animada (`Collapse`).
+- **Contenidos que se reemplazan:** carga, vacío, error y pestañas se cruzan con un fundido (`Swap`).
+- **Cambio de página:** la página que se va se despide mostrando su propio contenido, y la nueva entra.
+- **Selecciones:** las opciones elegidas (pestañas, modos de luces, bordes, canciones) se marcan con una pastilla que se desliza de una opción a otra.
+- **Menú del celular:** también anima su cierre antes de cerrarse.
+- **Reducir movimiento:** con esa preferencia del sistema (`MotionConfig reducedMotion="user"`), solo quedan fundidos.
+
+La escena 3D del taller (React Three Fiber) tiene sus propias animaciones y no usa Framer Motion.
+
 ## Decisiones (y por qué)
 
 Cuando el brief era ambiguo, elegimos la opción más tierna, accesible y segura para niños:

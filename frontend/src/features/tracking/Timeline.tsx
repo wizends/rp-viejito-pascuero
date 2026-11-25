@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { clsx } from 'clsx';
 import { Check } from 'lucide-react';
 import { formatDateTime } from '@/lib/time';
@@ -39,9 +39,17 @@ export function Timeline({
           >
             {/* conector */}
             {i < stops.length - 1 && (
-              <span
+              <span aria-hidden="true" className="absolute left-[23px] top-12 h-[calc(100%-2.5rem)] w-1 rounded-full bg-[repeating-linear-gradient(to_bottom,var(--turquesa)_0_6px,transparent_6px_12px)] opacity-40" />
+            )}
+            {/* tramo recorrido: se llena de oro hacia abajo al completarse la parada */}
+            {i < stops.length - 1 && (
+              <motion.span
                 aria-hidden="true"
-                className={clsx('absolute left-[23px] top-12 h-[calc(100%-2.5rem)] w-1 rounded-full', done ? 'bg-oro' : 'bg-[repeating-linear-gradient(to_bottom,var(--turquesa)_0_6px,transparent_6px_12px)] opacity-40')}
+                initial={false}
+                animate={{ scaleY: done ? 1 : 0 }}
+                transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                style={{ originY: 0 }}
+                className="absolute left-[23px] top-12 h-[calc(100%-2.5rem)] w-1 rounded-full bg-oro"
               />
             )}
             <span
@@ -53,11 +61,21 @@ export function Timeline({
               )}
             >
               <StopGlyph icon={s.icono} size={22} />
-              {done && (
-                <span aria-hidden="true" className="absolute -right-2 -top-2 grid h-6 w-6 rotate-12 place-items-center rounded-full border-2 border-dashed border-rojo bg-crema text-xs font-black text-rojo">
-                  <Check size={14} strokeWidth={3.5} />
-                </span>
-              )}
+              <AnimatePresence>
+                {done && (
+                  <motion.span
+                    key="sello"
+                    aria-hidden="true"
+                    initial={{ scale: 2.4, opacity: 0, rotate: -30 }}
+                    animate={{ scale: 1, opacity: 1, rotate: 12 }}
+                    exit={{ scale: 0.4, opacity: 0, transition: { duration: 0.15 } }}
+                    transition={{ type: 'spring', stiffness: 460, damping: 15 }}
+                    className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full border-2 border-dashed border-rojo bg-crema text-xs font-black text-rojo"
+                  >
+                    <Check size={14} strokeWidth={3.5} />
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </span>
             <button
               type="button"

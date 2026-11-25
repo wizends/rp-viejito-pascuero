@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
 import { ShieldCheck } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useSession } from '@/stores/session';
@@ -21,7 +22,16 @@ export function SettingsCard() {
   return (
     <div className="rounded-galleta bg-noche-700 p-4 text-hielo ring-1 ring-hielo/15">
       <h2 className="flex items-center gap-2 font-display text-lg text-crema">
-        <ShieldCheck size={20} className="text-muerdago" aria-hidden="true" /> Privacidad
+        <motion.span
+          key={user.allow_external_ai ? 'ia' : 'local'}
+          initial={{ rotate: -25, scale: 0.6 }}
+          animate={{ rotate: 0, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 420, damping: 16 }}
+          className="grid place-items-center"
+        >
+          <ShieldCheck size={20} className="text-muerdago" aria-hidden="true" />
+        </motion.span>{' '}
+        Privacidad
       </h2>
       <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm">
         <input

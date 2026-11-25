@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { fadeUp, pop } from '@/lib/motion';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Gift, MailOpen, MapPinned, Sparkles } from 'lucide-react';
 import { useScene } from '@/stores/scene';
@@ -94,11 +95,19 @@ export function LandingPage() {
           ) : (
             <NoScene />
           )}
-          {webgl && !failed && !ready && !SCENE_DEBUG.shot && (
-            <div className="absolute inset-0 grid place-items-center bg-[linear-gradient(180deg,var(--cielo),var(--cielo-claro))]">
-              <FakeProgress />
-            </div>
-          )}
+          {/* el telón de carga se levanta cuando la escena está lista */}
+          <AnimatePresence>
+            {webgl && !failed && !ready && !SCENE_DEBUG.shot && (
+              <motion.div
+                key="cargando"
+                initial={{ opacity: 1 }}
+                exit={{ opacity: 0, scale: 1.04, filter: 'blur(6px)', transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } }}
+                className="absolute inset-0 grid place-items-center bg-[linear-gradient(180deg,var(--cielo),var(--cielo-claro))]"
+              >
+                <FakeProgress />
+              </motion.div>
+            )}
+          </AnimatePresence>
           {/* Texto alternativo de la escena */}
           <p className="sr-only">
             Ilustración animada del taller del Polo Norte: el Viejito Pascuero, con sus lentes en la punta de la
@@ -109,8 +118,10 @@ export function LandingPage() {
           </p>
           {/* Título del libro (boceto): letras de cuento verde y rojo con acebo, sobre el papel */}
           <div className="pointer-events-none absolute inset-x-0 top-0 px-4 pt-4 text-center">
-            <h1
+            <motion.h1
               id="titulo"
+              initial={{ opacity: 0, y: -18, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } }}
               className="titulo-libro inline-flex flex-col items-center font-cuento text-4xl font-bold leading-[0.95] sm:text-6xl"
             >
               <span className="flex items-center gap-2 text-pino">
@@ -119,23 +130,35 @@ export function LandingPage() {
                 <Acebo className="h-7 w-9 sm:h-10 sm:w-12" />
               </span>
               <span className="text-rojo">Viejito Pascuero</span>
-            </h1>
-            <p className="papel-crema mx-auto mt-2 block max-w-xl rounded-2xl px-4 py-1.5 text-sm font-extrabold text-marino shadow-papel sm:text-base">
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0, transition: { delay: 0.25, duration: 0.5, ease: [0.22, 1, 0.36, 1] } }}
+              className="papel-crema mx-auto mt-2 block max-w-xl rounded-2xl px-4 py-1.5 text-sm font-extrabold text-marino shadow-papel sm:text-base">
               Escríbele tu carta y mira cómo la leen en el Polo Norte. ¡Jo, jo, jo!
-            </p>
+            </motion.p>
           </div>
           <div className="absolute inset-x-0 bottom-4 flex flex-col items-center gap-3 px-4">
             <SceneCaption />
-            {phase === 'idle' && ready && (
-              <button
-                type="button"
-                onClick={() => sendLetter(null)}
-                data-demo-carta
-                className="rounded-full bg-frambuesa px-5 py-2 text-sm font-extrabold text-white shadow-[0_6px_16px_-4px_rgb(227_48_111/0.7)] transition-transform duration-300 ease-rebote hover:scale-110 active:scale-95"
-              >
-                <Sparkles size={16} className="mr-1.5 inline" aria-hidden="true" />Ver cómo viaja una carta
-              </button>
-            )}
+            <AnimatePresence>
+              {phase === 'idle' && ready && (
+                <motion.button
+                  key="demo"
+                  type="button"
+                  onClick={() => sendLetter(null)}
+                  data-demo-carta
+                  initial="hidden"
+                  animate="shown"
+                  exit="gone"
+                  variants={pop}
+                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: 0.94 }}
+                  className="rounded-full bg-frambuesa px-5 py-2 text-sm font-extrabold text-white shadow-[0_6px_16px_-4px_rgb(227_48_111/0.7)]"
+                >
+                  <Sparkles size={16} className="mr-1.5 inline" aria-hidden="true" />Ver cómo viaja una carta
+                </motion.button>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </section>
@@ -143,18 +166,38 @@ export function LandingPage() {
       <div className="cinta-separador mx-auto mt-8 max-w-4xl" aria-hidden="true" />
 
       {/* ---------- Carta ---------- */}
-      <section id="carta" aria-labelledby="carta-titulo" className="mx-auto mt-6 max-w-4xl px-4">
+      <motion.section
+        id="carta"
+        aria-labelledby="carta-titulo"
+        initial="hidden"
+        whileInView="shown"
+        viewport={{ once: true, margin: '-80px' }}
+        variants={fadeUp}
+        className="mx-auto mt-6 max-w-4xl px-4"
+      >
         <LetterComposer reduced={reduced} />
-      </section>
+      </motion.section>
 
       {/* ---------- Cómo funciona ---------- */}
       <section aria-labelledby="como-titulo" className="mx-auto mt-20 max-w-5xl px-4">
-        <h2 id="como-titulo" className="text-center font-cuento text-4xl text-marino sm:text-5xl">
+        <motion.h2
+          id="como-titulo"
+          initial="hidden"
+          whileInView="shown"
+          viewport={{ once: true, margin: '-60px' }}
+          variants={fadeUp}
+          className="text-center font-cuento text-4xl text-marino sm:text-5xl"
+        >
           ¿Cómo funciona la magia?
-        </h2>
+        </motion.h2>
         {/* Ruta de vuelo: tres sellos postales unidos por la estela del trineo */}
         <div className="relative mt-10">
-          <svg
+          {/* la estela del trineo se dibuja de izquierda a derecha al llegar a esta sección */}
+          <motion.svg
+            initial={{ clipPath: 'inset(0 100% 0 0)' }}
+            whileInView={{ clipPath: 'inset(0 0% 0 0)' }}
+            viewport={{ once: true }}
+            transition={{ duration: 1.6, ease: [0.22, 1, 0.36, 1] }}
             aria-hidden="true"
             viewBox="0 0 1000 120"
             preserveAspectRatio="none"
@@ -169,7 +212,7 @@ export function LandingPage() {
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
             />
-          </svg>
+          </motion.svg>
           <ol className="relative grid gap-12 sm:grid-cols-3 sm:gap-8">
             {[
               {
@@ -196,8 +239,8 @@ export function LandingPage() {
             ].map((s, i) => (
               <motion.li
                 key={s.t}
-                initial={reduced ? false : { y: 14 }}
-                whileInView={{ y: 0 }}
+                initial={reduced ? false : { y: 24, opacity: 0 }}
+                whileInView={{ y: 0, opacity: 1 }}
                 viewport={{ once: true, margin: '-60px' }}
                 transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: i * 0.1 }}
                 className="flex flex-col items-center text-center"

@@ -78,11 +78,16 @@ func Open(target string) (*Store, error) {
 		// funciones serverless: pocas conexiones por instancia (Neon usa un pooler)
 		db.SetMaxOpenConns(5)
 		db.SetConnMaxIdleTime(time.Minute)
-		if _, err := db.Exec(schemaPostgres); err != nil {
-			db.Close()
-			return nil, fmt.Errorf("esquema: %w", err)
+		// Neon puede tardar unos segundos en despertar: se reintenta antes de rendirse
+		var err2 error
+		for i := 0; i < 5; i++ {
+			if err2 = applyPostgresSchema(db); err2 == nil {
+				return &Store{DB: db, postgres: true}, nil
+			}
+			time.Sleep(time.Duration(i+1) * 500 * time.Millisecond)
 		}
-		return &Store{DB: db, postgres: true}, nil
+		db.Close()
+		return nil, fmt.Errorf("esquema: %w", err2)
 	}
 	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 		return nil, err
@@ -101,6 +106,26 @@ func Open(target string) (*Store, error) {
 }
 
 func (s *Store) Close() error { return s.DB.Close() }
+
+// applyPostgresSchema crea las tablas bajo un candado de sesión: en Vercel varias
+// instancias arrancan a la vez y CREATE TABLE IF NOT EXISTS concurrente puede fallar
+// en PostgreSQL ("duplicate key value violates unique constraint pg_type…").
+func applyPostgresSchema(db *sql.DB) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	const lockID = 72_2412_25 // "Nochebuena"
+	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, lockID); err != nil {
+		return err
+	}
+	defer conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, lockID) //nolint:errcheck
+	_, err = conn.ExecContext(ctx, schemaPostgres)
+	return err
+}
 
 // rb adapta los marcadores ? al formato de PostgreSQL ($1, $2…).
 func (s *Store) rb(q string) string {

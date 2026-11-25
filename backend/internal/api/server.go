@@ -130,6 +130,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /ws/letters", s.wsLetters)
 	mux.HandleFunc("GET /ws/tracking/{code}", s.wsTracking)
 
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, _ *http.Request) {
+		// quien abre la URL del backend ve que está vivo y dónde está la API
+		writeJSON(w, http.StatusOK, map[string]string{"estado": "jo jo jo", "api": "/api", "salud": "/api/health"})
+	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"detail": "Not Found"})
 	})

@@ -19,36 +19,48 @@ Luego abre **http://localhost:8080**. Docker levanta dos servicios: `frontend` (
 
 ## Publicar en Vercel
 
-La web y la API se publican juntas en **un solo proyecto de Vercel** con [Vercel Services](https://vercel.com/docs/services) (beta): `vercel.json` en la raíz define el servicio `web` (Vite, carpeta `frontend/`) y el servicio `api` (Go, carpeta `backend/`), y enruta `/api/*` y `/ws/*` a la API y todo lo demás a la web. Mismo dominio: cookies de sesión y CSRF funcionan sin proxy. Todo con planes gratuitos: Vercel Hobby, Neon y (opcional) Redis.
+Se publican **dos proyectos de Vercel** desde el mismo repo, ambos con planes gratuitos (Vercel Hobby, Neon y, opcional, Redis):
 
-1. **Importa el repo** en Vercel con la **raíz del repositorio** como Root Directory (no `frontend/` ni `backend/`): `vercel.json` describe los dos servicios.
-2. **Conecta el almacenamiento** desde la pestaña *Storage* del proyecto (ambos con plan gratuito):
-   - **Neon** (PostgreSQL), obligatorio: define `DATABASE_URL`. Ahí viven las cuentas, cartas, fotos y trayectos.
-   - **Redis**, opcional: define `REDIS_URL` y activa los avisos en vivo (WebSockets). En Vercel cada WebSocket queda fijo en una instancia; Redis reparte los eventos entre ellas. Sin Redis todo funciona igual, con consultas cada pocos segundos.
-3. **Variables de entorno** (Settings → Environment Variables):
+| Proyecto | Root Directory | Qué es |
+| --- | --- | --- |
+| **backend** | `backend` | API en Go (Vercel la detecta sola por `go.mod` y `cmd/server/main.go`). `backend/vercel.json` define el cron diario. |
+| **frontend** | `frontend` | La web. `frontend/vercel.json` arma la salida con `scripts/vercel-output.mjs`: rutas de la SPA, cabeceras de seguridad y el **proxy de `/api/*` al backend**. |
 
-   | Variable | Valor |
-   | --- | --- |
-   | `ENVIRONMENT` | `production` |
-   | `SECRET_KEY` | 48+ caracteres aleatorios (`openssl rand -base64 48`) |
-   | `COOKIE_SECURE` | `true` |
-   | `CORS_ORIGINS` | `https://tu-proyecto.vercel.app` (y tu dominio propio, separados por coma); valida el origen de los WebSockets |
-   | `SERVERLESS` | `true` (también se activa solo con `VERCEL=1`) |
-   | `TRUST_FORWARDED_FOR` | `true`, para que el rate limit vea la IP de cada visitante |
-   | `MAX_UPLOAD_MB` | `4` (Vercel acepta hasta 4,5 MB por petición a Go) |
-   | `CRON_SECRET` | un valor aleatorio; Vercel Cron lo envía al llamar a `/api/cron/tick` |
-   | `VISION_PROVIDER` + clave | opcional: `gemini`, `groq` u `openrouter` con su API key gratuita |
+Gracias al proxy el navegador ve un solo dominio (el de la web): las cookies de sesión y el CSRF funcionan igual que en Docker.
 
-4. **Despliega.** Si el build nativo de Go fallara (por ejemplo, por la versión 1.26 del `go.mod`), el servicio `api` puede publicarse como contenedor con el `backend/Dockerfile` existente: en `vercel.json`, cambia `"framework": "go"` por `"runtime": "container"`.
+**1. Proyecto backend**
+- *Storage*: conecta **Neon** (obligatorio, define `DATABASE_URL`) y, si quieres avisos en vivo, **Redis** (opcional, define `REDIS_URL`).
+- Variables:
 
-En modo serverless no hay procesos corriendo entre visitas, así que:
+  | Variable | Valor |
+  | --- | --- |
+  | `ENVIRONMENT` | `production` |
+  | `SECRET_KEY` | 48+ caracteres aleatorios |
+  | `COOKIE_SECURE` | `true` |
+  | `CORS_ORIGINS` | el dominio de la **web**, p. ej. `https://buzon.vercel.app` (valida el origen de los WebSockets) |
+  | `TRUST_FORWARDED_FOR` | `true` (Vercel entrega la IP real en `X-Forwarded-For`) |
+  | `MAX_UPLOAD_MB` | `4` (Vercel acepta hasta 4,5 MB por petición a Go) |
+  | `CRON_SECRET` | un valor aleatorio |
+  | `VISION_PROVIDER` + clave | opcional: `gemini`, `groq` u `openrouter` |
 
-- la carta (y la lectura opcional con IA) se procesa durante la misma subida;
-- las paradas con hora se completan al consultar el trayecto (la vista del niño consulta cada minuto, además del WebSocket);
-- un **Vercel Cron diario** (`crons` en `vercel.json`) también avanza paradas y borra las fotos vencidas;
-- **con Redis**, los WebSockets avisan al instante (la carta leída, la parada completada) aunque el cambio ocurra en otra instancia; se cortan a la duración máxima de la función (5 minutos en Hobby) y el navegador se reconecta solo;
-- **sin Redis**, un WebSocket no recibiría los avisos de otras instancias, así que el backend lo cierra con el código 4410 (el navegador no reintenta);
-- en ambos casos la web también consulta: el estado de la carta cada 3 s mientras el Viejito la lee y el seguimiento del niño cada 15 s, celebrando las paradas recién completadas.
+- Comprueba `https://<backend>.vercel.app/api/health` → `{"estado":"jo jo jo"}`.
+
+**2. Proyecto frontend**
+- Variables (se leen al compilar: vuelve a desplegar si las cambias):
+
+  | Variable | Valor |
+  | --- | --- |
+  | `BACKEND_URL` | el dominio de producción del backend, p. ej. `https://buzon-backend.vercel.app` (sin barra final). Sin ella la web queda en modo vitrina y `/api` responde 503. |
+  | `VITE_WS_URL` | lo mismo con `wss://`, p. ej. `wss://buzon-backend.vercel.app` (el proxy de Vercel no reenvía WebSockets) |
+  | `VITE_MAP_TILES_URL` | opcional |
+
+Usa el dominio **estable** de producción del backend (Settings → Domains), no la URL de un despliegue puntual, que cambia en cada push.
+
+En Vercel el backend corre sin procesos de fondo: la carta (y la lectura opcional con IA) se procesa durante la subida, las paradas con hora se completan al consultar el trayecto y el cron diario también avanza paradas y borra fotos vencidas. La web consulta el estado de la carta cada 3 s mientras el Viejito la lee y el seguimiento del niño cada 15 s. Con Redis, además, el seguimiento recibe avisos al instante por WebSocket; sin Redis el backend cierra los WebSockets con el código 4410 y queda solo la consulta. Los avisos de cartas por WebSocket no llegan entre dominios (la cookie de sesión es de la web), por eso esas siempre se consultan.
+
+Si el build nativo de Go fallara por la versión del `go.mod` (1.26), el proyecto backend puede publicarse como contenedor con `backend/Dockerfile`.
+
+Para revisar la salida de la web en local: `cd frontend && BACKEND_URL=https://… npm run build:vercel`.
 
 ## Desarrollo local (sin Docker)
 

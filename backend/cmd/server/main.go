@@ -36,6 +36,11 @@ func main() {
 		os.Exit(checkHealth(cfg.Addr))
 	}
 
+	if cfg.Serverless && !store.IsPostgres(cfg.DBTarget()) {
+		// en Vercel el disco no persiste: sin PostgreSQL se perderían las cuentas y cartas
+		slog.Error("falta DATABASE_URL: conecta Neon (Storage → Neon) al proyecto de Vercel")
+		os.Exit(1)
+	}
 	st, err := store.Open(cfg.DBTarget())
 	if err != nil {
 		slog.Error("no se pudo abrir la base", "err", err)

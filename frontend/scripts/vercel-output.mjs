@@ -8,17 +8,19 @@
 //  - Los WebSockets no pasan por el proxy de Vercel: el frontend se conecta
 //    directo a VITE_WS_URL (se agrega a connect-src de la CSP).
 //
-// Uso (lo corre Vercel, ver vercel.json):  node frontend/scripts/vercel-output.mjs
+// Uso (lo corre Vercel con Root Directory = frontend, ver frontend/vercel.json):
+//   npm run build:vercel
 import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const dist = join(root, 'frontend', 'dist');
+// carpeta frontend/ (la raíz del proyecto en Vercel)
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const dist = join(root, 'dist');
 const out = join(root, '.vercel', 'output');
 
 if (!existsSync(join(dist, 'index.html'))) {
-  console.error('Falta frontend/dist: corre primero `npm run build` en frontend/.');
+  console.error('Falta dist/: corre primero `npm run build`.');
   process.exit(1);
 }
 
@@ -68,4 +70,4 @@ mkdirSync(out, { recursive: true });
 cpSync(dist, join(out, 'static'), { recursive: true });
 writeFileSync(join(out, 'config.json'), JSON.stringify({ version: 3, routes }, null, 2));
 
-console.log(`Salida de Vercel lista en .vercel/output (API: ${backend || 'sin backend, modo vitrina'}; WS: ${wsUrl || 'mismo origen'})`);
+console.log(`Salida de Vercel lista en frontend/.vercel/output (API: ${backend || 'sin backend, modo vitrina'}; WS: ${wsUrl || 'mismo origen'})`);

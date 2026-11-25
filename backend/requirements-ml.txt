@@ -1,0 +1,5 @@
+# Motores pesados (se instalan en Docker con INSTALL_ML=true).
+# torch se instala antes desde el índice CPU para no bajar CUDA.
+easyocr>=1.7.2
+transformers>=4.46
+sentencepiece>=0.2

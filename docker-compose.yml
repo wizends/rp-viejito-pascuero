@@ -1,0 +1,70 @@
+name: buzon-viejito-pascuero
+
+x-backend-env: &backend-env
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+psycopg://pascuero:${POSTGRES_PASSWORD:-pascuero}@postgres:5432/buzon
+    REDIS_URL: redis://redis:6379/0
+    TASK_BACKEND: rq
+    UPLOAD_DIR: /app/data/uploads
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: pascuero
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pascuero}
+      POSTGRES_DB: buzon
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pascuero -d buzon"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      args:
+        INSTALL_ML: ${INSTALL_ML:-true}
+    <<: *backend-env
+    volumes:
+      - uploads:/app/data/uploads
+      - models:/app/.cache
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      retries: 12
+
+  worker:
+    build:
+      context: ./backend
+      args:
+        INSTALL_ML: ${INSTALL_ML:-true}
+    <<: *backend-env
+    command: ["python", "-m", "app.workers.worker"]
+    volumes:
+      - uploads:/app/data/uploads
+      - models:/app/.cache
+    depends_on:
+      backend: { condition: service_healthy }
+
+  frontend:
+    build: ./frontend
+    ports: ["8080:80"]
+    depends_on:
+      backend: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  uploads:
+  models:

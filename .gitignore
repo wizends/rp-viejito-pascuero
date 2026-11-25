@@ -1,0 +1,24 @@
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+backend/*.db
+backend/data/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.impeccable/
+*.tsbuildinfo
+
+# Secretos y entorno local
+.env
+.env.local
+frontend/.env.local
+
+# Herramientas locales de Claude Code (skills de terceros, ajustes personales)
+.claude/skills/
+.claude/settings.local.json

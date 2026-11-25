@@ -95,3 +95,10 @@ CREATE TABLE IF NOT EXISTS tree_photos (
   data BYTEA NOT NULL,
   created_at TEXT NOT NULL
 );
+
+-- Diseño de la postal navideña de cada carta (JSON validado por la API), para editarla desde cualquier equipo.
+CREATE TABLE IF NOT EXISTS letter_postcards (
+  letter_id TEXT PRIMARY KEY REFERENCES letters(id) ON DELETE CASCADE,
+  design TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);

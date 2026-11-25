@@ -9,6 +9,9 @@ import type {
   User,
 } from './types';
 
+/** El editor define la forma exacta; la API solo la guarda y la devuelve. */
+export type PostcardDesign = Record<string, unknown> & { show?: 'foto' | 'texto' };
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -137,6 +140,10 @@ export const api = {
   ) => request<Letter>(`/letters/${id}`, { method: 'PATCH', json: patch }),
   letter: (id: string) => request<Letter>(`/letters/${id}`),
   letterImage: (id: string) => image(`/letters/${id}/image`),
+  /** Diseño de la postal de la carta, guardado en la cuenta. */
+  postcard: (id: string) => request<{ design: PostcardDesign; updated_at: string }>(`/letters/${id}/postcard`),
+  savePostcard: (id: string, design: PostcardDesign) =>
+    request<{ design: PostcardDesign; updated_at: string }>(`/letters/${id}/postcard`, { method: 'PUT', json: { design } }),
   deleteLetter: (id: string) => request<void>(`/letters/${id}`, { method: 'DELETE' }),
 
   shipment: (childId: string) => request<Shipment>(`/children/${childId}/shipment`),

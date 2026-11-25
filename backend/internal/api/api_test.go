@@ -528,7 +528,8 @@ func TestRetentionPurgesOldImages(t *testing.T) {
 	c := e.parent("j@ejemplo.cl")
 	kid := c.child("Gabi")
 	id := c.post("/api/letters/upload", upload(map[string]string{"child_id": kid}, testJPEG(t))).json(t)["id"].(string)
-	e.now = e.now.AddDate(0, 0, 61)
+	// la carta se guarda con la hora real: el reloj de prueba se adelanta desde ahí
+	e.now = time.Now().AddDate(0, 0, 61)
 	e.srv.purgeExpiredImages(context.Background())
 	c.login("j@ejemplo.cl") // el reloj avanzó: la sesión anterior venció
 	if l := c.get("/api/letters/" + id).json(t); l["has_image"] != false {

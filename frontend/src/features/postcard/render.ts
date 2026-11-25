@@ -527,7 +527,7 @@ function drawLetter(c: CanvasRenderingContext2D, p: Postcard, content: LetterCon
 
 // ---------- textos ----------
 
-function drawTexts(c: CanvasRenderingContext2D, p: Postcard, W: number, H: number) {
+function drawTexts(c: CanvasRenderingContext2D, p: Postcard, W: number, H: number, link?: string) {
   const t = THEMES[p.theme];
   const style = p.style ?? 'tradicional';
   const fonts = FONTS[style];
@@ -552,12 +552,30 @@ function drawTexts(c: CanvasRenderingContext2D, p: Postcard, W: number, H: numbe
     c.font = fonts.sign(size);
     drawStyledText(c, style, 'sign', p.signature.trim().slice(0, 60), W / 2, H * (tall ? 0.885 : 0.895), size, { ...look, color: t.sign }, r);
   }
-  c.globalAlpha = 0.7;
+  drawFooter(c, W, H, link);
+  c.restore();
+}
+
+/** Sello al pie con la dirección de la app, para que quien vea la postal escriba la suya. */
+function drawFooter(c: CanvasRenderingContext2D, W: number, H: number, link?: string) {
+  const text = link ? `Escribe tu carta en ${link}` : 'Buzón del Viejito Pascuero';
+  c.save();
   c.textAlign = 'center';
   c.textBaseline = 'middle';
-  c.font = `800 ${W * 0.019}px Nunito, system-ui, sans-serif`;
-  c.fillStyle = p.theme === 'bosque' ? '#2f6b4a' : t.sign;
-  c.fillText('Buzón del Viejito Pascuero', W / 2, H - W * 0.062);
+  c.font = `800 ${W * 0.021}px Nunito, system-ui, sans-serif`;
+  const tw = Math.min(W * 0.86, c.measureText(text).width);
+  const ph = W * 0.04;
+  const pw = tw + ph * 1.4;
+  const y = H - W * 0.052;
+  c.fillStyle = 'rgb(255 253 247 / 0.9)';
+  c.shadowColor = 'rgb(0 0 0 / 0.25)';
+  c.shadowBlur = W * 0.008;
+  c.beginPath();
+  c.roundRect(W / 2 - pw / 2, y - ph / 2, pw, ph, ph / 2);
+  c.fill();
+  c.shadowColor = 'transparent';
+  c.fillStyle = '#a8121f';
+  c.fillText(text, W / 2, y, W * 0.86);
   c.restore();
 }
 
@@ -566,6 +584,8 @@ function drawTexts(c: CanvasRenderingContext2D, p: Postcard, W: number, H: numbe
 export interface RenderAssets {
   stickers: Record<StickerId, CanvasImageSource>;
   letter: LetterContent;
+  /** dirección de la app, escrita al pie para que otros la usen */
+  link?: string;
 }
 
 /** Dibuja la postal y devuelve dónde quedó la carta (para arrastrarla). */
@@ -609,7 +629,7 @@ export function renderPostcard(c: CanvasRenderingContext2D, p: Postcard, a: Rend
     c.restore();
   }
   // los textos van al final: encima del borde, la nieve y los stickers, siempre legibles
-  drawTexts(c, p, W, H);
+  drawTexts(c, p, W, H, a.link);
 
   const selBox = sel?.type === 'carta' ? letter : sel?.type === 'sticker' ? p.stickers.find((s) => s.id === sel.id) : null;
   if (selBox) {

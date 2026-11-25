@@ -114,6 +114,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/letters/{id}/image", s.authed(s.letterImage))
 	mux.HandleFunc("PATCH /api/letters/{id}", s.authed(s.updateLetter))
 	mux.HandleFunc("DELETE /api/letters/{id}", s.authed(s.deleteLetter))
+	mux.HandleFunc("GET /api/letters/{id}/postcard", s.authed(s.getPostcard))
+	mux.HandleFunc("PUT /api/letters/{id}/postcard", s.authed(s.putPostcard))
 
 	// trayecto del regalo
 	mux.HandleFunc("GET /api/children/{id}/shipment", s.authed(s.getShipment))

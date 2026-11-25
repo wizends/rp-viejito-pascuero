@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { clsx } from 'clsx';
 import {
   ArrowLeft,
+  Cloud,
+  CloudOff,
   BringToFront,
   Download,
   Minus,
@@ -12,12 +14,11 @@ import {
   ShieldAlert,
   Trash2,
   Undo2,
-  Copy,
   RefreshCcw,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { readJSON, writeJSON } from '@/lib/storage';
 import { MagicButton } from '@/components/ui/MagicButton';
 import { toast } from '@/components/ui/Toast';
@@ -68,17 +69,57 @@ export default function PostcardPage() {
   }, [photo.data, show, text]);
 
   const key = `postal:${letterId}`;
+  // el diseño vive en la cuenta (se edita desde cualquier equipo); el navegador guarda una copia
+  const remote = useQuery({
+    queryKey: ['postcard', letterId],
+    queryFn: async () => {
+      try {
+        return await api.postcard(letterId);
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+    retry: false,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
   const [p, setP] = useState<Postcard | null>(null);
+  const lastSaved = useRef<string | null>(null);
   useEffect(() => {
-    if (letter.data && children.data && !p) {
-      // las postales guardadas antes de un cambio reciben lo que les falte (p. ej. el estilo)
-      const saved = readJSON<Partial<Postcard> | null>(key, null);
-      setP({ ...defaultPostcard(nickname), ...saved });
-    }
-  }, [letter.data, children.data, p, key, nickname]);
+    if (!letter.data || !children.data || p || remote.isLoading) return;
+    const fromServer = remote.data?.design ?? null;
+    const local = readJSON<SavedDesign | null>(key, null);
+    const base = fromServer ?? local;
+    // los diseños guardados antes de un cambio reciben lo que les falte (p. ej. el estilo)
+    setP({ ...defaultPostcard(nickname), ...base });
+    if (base?.show) setShow(base.show);
+    // lo que ya está en la base no se vuelve a subir; un diseño solo local, sí
+    lastSaved.current = fromServer ? JSON.stringify({ ...defaultPostcard(nickname), ...fromServer }) : null;
+  }, [letter.data, children.data, p, key, nickname, remote.isLoading, remote.data]);
+
+  const [saveState, setSaveState] = useState<SaveState>('guardado');
   useEffect(() => {
-    if (p) writeJSON(key, p);
-  }, [p, key]);
+    if (!p) return;
+    const design: SavedDesign = { ...p, show };
+    writeJSON(key, design);
+    const body = JSON.stringify(design);
+    if (body === lastSaved.current) return;
+    setSaveState('guardando');
+    const t = window.setTimeout(() => {
+      api
+        .savePostcard(letterId, design)
+        .then(() => {
+          lastSaved.current = body;
+          setSaveState('guardado');
+        })
+        .catch(() => setSaveState('error'));
+    }, 800);
+    return () => window.clearTimeout(t);
+  }, [p, show, key, letterId]);
+  useEffect(() => {
+    if (remote.isError) setSaveState('error');
+  }, [remote.isError]);
 
   const [stickers, setStickers] = useState<Record<StickerId, HTMLImageElement> | null>(null);
   const [fontsReady, setFontsReady] = useState(false);
@@ -100,7 +141,7 @@ export default function PostcardPage() {
       cv.width = f.w;
       cv.height = f.h;
     }
-    letterBox.current = renderPostcard(cv.getContext('2d')!, p, { stickers, letter: content }, sel);
+    letterBox.current = renderPostcard(cv.getContext('2d')!, p, { stickers, letter: content, link: window.location.host }, sel);
   }, [p, sel, stickers, content, fontsReady]);
 
   const update = (fn: (q: Postcard) => Postcard) => setP((q) => (q ? fn(q) : q));
@@ -116,7 +157,7 @@ export default function PostcardPage() {
           letter: {
             x: ch.x ?? q.letter.x,
             y: ch.y ?? q.letter.y,
-            rot: ch.rot ?? q.letter.rot,
+            rot: wrapAngle(ch.rot ?? q.letter.rot),
             scale: clamp(ch.size ?? q.letter.scale, 0.45, 1.35),
           },
         };
@@ -127,7 +168,7 @@ export default function PostcardPage() {
           stickers: q.stickers.map((s) => {
             if (s.id !== sel.id) return s;
             const ch = fn(s);
-            return { ...s, ...ch, size: clamp(ch.size ?? s.size, 0.05, 0.5) };
+            return { ...s, ...ch, rot: wrapAngle(ch.rot ?? s.rot), size: clamp(ch.size ?? s.size, 0.05, 0.5) };
           }),
         };
       }
@@ -261,7 +302,7 @@ export default function PostcardPage() {
     const cv = document.createElement('canvas');
     cv.width = f.w;
     cv.height = f.h;
-    renderPostcard(cv.getContext('2d')!, q, { stickers: stickers!, letter: content! });
+    renderPostcard(cv.getContext('2d')!, q, { stickers: stickers!, letter: content!, link: window.location.host });
     return new Promise((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error('No se pudo crear la imagen.'))), 'image/png'));
   };
   // la imagen se prepara apenas se deja de editar: así "Compartir" abre al instante
@@ -282,24 +323,16 @@ export default function PostcardPage() {
   const currentPng = async () => (png && png.of === p ? png.blob : renderPng(p!));
 
   const fileOf = (b: Blob) => new File([b], 'postal-navidena.png', { type: 'image/png' });
-  const nativeShare = useMemo(
-    () => typeof navigator !== 'undefined' && !!navigator.share && !!navigator.canShare?.({ files: [fileOf(new Blob(['x'], { type: 'image/png' }))] }),
+  const appUrl = window.location.origin;
+  // en el celular se comparte a las redes; en el computador se descarga directo
+  const mobileShare = useMemo(
+    () =>
+      typeof navigator !== 'undefined' &&
+      !!navigator.share &&
+      !!navigator.canShare?.({ files: [fileOf(new Blob(['x'], { type: 'image/png' }))] }) &&
+      window.matchMedia('(pointer: coarse)').matches,
     [],
   );
-  const [shareMenu, setShareMenu] = useState(false);
-  const actionsRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!shareMenu) return;
-    const close = (e: Event) => {
-      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !actionsRef.current?.contains(e.target as Node)) setShareMenu(false);
-    };
-    document.addEventListener('pointerdown', close);
-    document.addEventListener('keydown', close);
-    return () => {
-      document.removeEventListener('pointerdown', close);
-      document.removeEventListener('keydown', close);
-    };
-  }, [shareMenu]);
   const download = async () => {
     const url = URL.createObjectURL(await currentPng());
     const a = document.createElement('a');
@@ -307,23 +340,17 @@ export default function PostcardPage() {
     a.download = 'postal-navidena.png';
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
-    setShareMenu(false);
-  };
-  const copyImage = async () => {
-    try {
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': currentPng() })]);
-      toast('Imagen copiada. Pégala en Instagram, WhatsApp o Facebook.');
-    } catch {
-      toast('Este navegador no deja copiar imágenes. Usa "Descargar".', 'error');
-    }
-    setShareMenu(false);
+    toast('Postal descargada. ¡Súbela a tus redes!');
   };
   const share = async () => {
-    if (!nativeShare) return setShareMenu((v) => !v);
     try {
-      await navigator.share({ files: [fileOf(await currentPng())], title: 'Postal navideña', text: '¡Mi carta al Viejito Pascuero! 🎄' });
+      await navigator.share({
+        files: [fileOf(await currentPng())],
+        title: 'Postal navideña',
+        text: `¡Mi carta al Viejito Pascuero! 🎄 Escribe la tuya en ${appUrl}`,
+      });
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') setShareMenu(true); // no se pudo: se ofrecen las otras formas
+      if ((e as Error).name !== 'AbortError') void download(); // no se pudo compartir: se descarga
     }
   };
 
@@ -407,10 +434,16 @@ export default function PostcardPage() {
             )}
           </div>
 
-          <div ref={actionsRef} className="relative mt-2 flex flex-wrap items-center justify-center gap-2">
-            <MagicButton variant="rojo" icon={<Share2 size={18} aria-hidden="true" />} onClick={() => void share()} aria-expanded={nativeShare ? undefined : shareMenu}>
-              Compartir postal
-            </MagicButton>
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+            {mobileShare ? (
+              <MagicButton variant="rojo" icon={<Share2 size={18} aria-hidden="true" />} onClick={() => void share()}>
+                Compartir en redes
+              </MagicButton>
+            ) : (
+              <MagicButton variant="rojo" icon={<Download size={18} aria-hidden="true" />} onClick={() => void download()}>
+                Descargar postal
+              </MagicButton>
+            )}
             {canUndo ? (
               <MagicButton variant="oro" icon={<Undo2 size={16} aria-hidden="true" />} onClick={undoReset}>
                 Deshacer
@@ -420,18 +453,8 @@ export default function PostcardPage() {
                 Empezar de nuevo
               </MagicButton>
             )}
-            {shareMenu && (
-              <div role="menu" className="absolute bottom-full left-1/2 z-30 mb-2 w-72 -translate-x-1/2 rounded-2xl bg-white p-2 text-tinta shadow-papel ring-1 ring-black/5">
-                <p className="px-2 pb-1 pt-1 text-xs font-bold text-tinta-suave">Este navegador no abre el menú para compartir. Puedes:</p>
-                <button type="button" role="menuitem" onClick={() => void copyImage()} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-extrabold hover:bg-cielo-claro">
-                  <Copy size={16} aria-hidden="true" /> Copiar imagen y pegarla en tu red social
-                </button>
-                <button type="button" role="menuitem" onClick={() => void download()} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-extrabold hover:bg-cielo-claro">
-                  <Download size={16} aria-hidden="true" /> Descargar imagen
-                </button>
-              </div>
-            )}
           </div>
+          <SaveStatus state={saveState} />
           {canUndo && <p className="mt-1 text-center text-xs font-bold text-tinta-suave" role="status">Postal reiniciada. ¿Te arrepentiste? Toca Deshacer.</p>}
         </div>
 
@@ -600,6 +623,27 @@ function StyleCard({ style, active, onPick }: { style: Style; active: boolean; o
         <span className="block text-[11px] font-semibold leading-tight text-tinta-suave">{STYLES[style].hint}</span>
       </span>
     </button>
+  );
+}
+
+/** Diseño que se guarda en la cuenta (incluye si se muestra la foto o el texto). */
+type SavedDesign = Partial<Postcard> & { show?: 'foto' | 'texto' };
+type SaveState = 'guardado' | 'guardando' | 'error';
+
+/** Ángulo entre -π y π (el giro no crece sin fin). */
+const wrapAngle = (r: number) => Math.atan2(Math.sin(r), Math.cos(r));
+
+function SaveStatus({ state }: { state: SaveState }) {
+  const map = {
+    guardado: { icon: <Cloud size={14} aria-hidden="true" />, text: 'Guardada en tu cuenta: ábrela desde cualquier equipo.' },
+    guardando: { icon: <Cloud size={14} aria-hidden="true" className="motion-safe:animate-pulse" />, text: 'Guardando…' },
+    error: { icon: <CloudOff size={14} aria-hidden="true" />, text: 'Sin conexión: quedó guardada en este equipo y se subirá al volver a editar.' },
+  }[state];
+  return (
+    <p role="status" className={clsx('mt-1 flex items-center justify-center gap-1.5 text-center text-xs font-bold', state === 'error' ? 'text-rojo-baya' : 'text-tinta-suave')}>
+      {map.icon}
+      {map.text}
+    </p>
   );
 }
 

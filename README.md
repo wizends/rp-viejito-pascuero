@@ -172,9 +172,13 @@ Cada carta del panel tiene el botón **Crear postal** (`/postal/<id>`). Abre un 
   Los efectos se aplican con canvas sobre las mismas ilustraciones, así que cada fondo, borde o sticker nuevo funciona en todos los estilos.
 - **Textos:** título y firma editables.
 - **Stickers:** 23 ilustraciones propias, en dos grupos: Navidad clásica y Rosado y brillante (corazones, arcoíris, brillitos, reno con corazones, lazo y más). Los stickers y la carta se arrastran, se agrandan y se giran, con el mouse, el dedo o el teclado.
-- **Compartir:** *Compartir postal* abre al instante el menú de compartir del celular o del computador, porque la imagen se prepara mientras editas. Si el navegador no tiene ese menú, ofrece copiar la imagen para pegarla en la red social, o descargarla en PNG. *Empezar de nuevo* reinicia el diseño (conserva el formato) y se puede deshacer.
+- **Compartir:** en el celular, *Compartir en redes* abre al instante el menú del teléfono (Instagram, WhatsApp, Facebook…). La imagen se prepara mientras editas, y el texto incluye el link de la app. En el computador, *Descargar postal* baja el PNG directo. La postal lleva al pie "Escribe tu carta en <dominio>" para que quien la vea use la app. *Empezar de nuevo* reinicia el diseño (conserva el formato) y se puede deshacer.
+- **Guardada en la cuenta:** el diseño de cada carta se guarda en la base (tabla `letter_postcards`) y se puede seguir editando desde cualquier equipo.
+  - Se guarda solo, un momento después de cada cambio.
+  - El navegador guarda además una copia, por si no hay conexión.
+  - La API (`GET`/`PUT /api/letters/{id}/postcard`) guarda solo campos conocidos y validados, y la postal se borra junto con su carta.
 
-Todo se dibuja en un canvas del navegador (`frontend/src/features/postcard/`), así que la vista previa y la imagen final son la misma. No se sube nada nuevo al servidor. El diseño de cada postal queda guardado en el navegador. Antes de publicar, el editor recuerda revisar que en la carta no se vean datos que identifiquen al niño.
+Todo se dibuja en un canvas del navegador (`frontend/src/features/postcard/`), así que la vista previa y la imagen final son la misma. Al servidor solo viaja el diseño, nunca la imagen. Antes de publicar, el editor recuerda revisar que en la carta no se vean datos que identifiquen al niño.
 
 ### Música navideña
 

@@ -102,7 +102,7 @@ export const api = {
     const fd = new FormData();
     fd.set('child_id', child_id);
     fd.set('mensaje', mensaje);
-    fd.set('file', file, 'carta.png');
+    fd.set('file', file, 'carta.jpg');
     return request<Letter>('/letters/upload', { method: 'POST', body: fd });
   },
   updateLetter: (

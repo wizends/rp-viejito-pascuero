@@ -14,7 +14,10 @@ interface Props {
   onSubmit: (v: { file: Blob; mensaje: string }) => Promise<void>;
 }
 
-/** Recorta y rota en un canvas; devuelve PNG. */
+/** Lado mayor de la foto que se envía (el servidor tampoco guarda más). */
+const MAX_SIDE = 2400;
+
+/** Recorta, rota y achica en un canvas; devuelve JPEG (liviano para subir). */
 async function cropImage(src: string, area: Area, rotation: number): Promise<Blob> {
   const img = await new Promise<HTMLImageElement>((res, rej) => {
     const i = new Image();
@@ -34,11 +37,15 @@ async function cropImage(src: string, area: Area, rotation: number): Promise<Blo
   sctx.translate(bw / 2, bh / 2);
   sctx.rotate(rad);
   sctx.drawImage(img, -img.width / 2, -img.height / 2);
+  const scale = Math.min(1, MAX_SIDE / Math.max(area.width, area.height));
   const out = document.createElement('canvas');
-  out.width = Math.round(area.width);
-  out.height = Math.round(area.height);
-  out.getContext('2d')!.drawImage(stage, area.x, area.y, area.width, area.height, 0, 0, area.width, area.height);
-  return new Promise((res, rej) => out.toBlob((b) => (b ? res(b) : rej(new Error('crop'))), 'image/png'));
+  out.width = Math.round(area.width * scale);
+  out.height = Math.round(area.height * scale);
+  const octx = out.getContext('2d')!;
+  octx.fillStyle = '#ffffff'; // fondo blanco para PNG transparentes
+  octx.fillRect(0, 0, out.width, out.height);
+  octx.drawImage(stage, area.x, area.y, area.width, area.height, 0, 0, out.width, out.height);
+  return new Promise((res, rej) => out.toBlob((b) => (b ? res(b) : rej(new Error('crop'))), 'image/jpeg', 0.9));
 }
 
 /** Subir foto o escaneo con vista previa, recorte y rotación. */
@@ -55,7 +62,7 @@ export function UploadLetterForm({ disabled, busy, externalAi, onSubmit }: Props
 
   useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
 
-  const canPreview = !!file && /^image\/(jpeg|png)$/.test(file.type);
+  const canPreview = !!file && /^image\/(jpeg|png|webp)$/.test(file.type);
 
   const pick = (f: File | undefined) => {
     if (!f) return;
@@ -65,7 +72,7 @@ export function UploadLetterForm({ disabled, busy, externalAi, onSubmit }: Props
     setFile(f);
     setRotation(0);
     setZoom(1);
-    setPreview(/^image\/(jpeg|png)$/.test(f.type) ? URL.createObjectURL(f) : null);
+    setPreview(/^image\/(jpeg|png|webp)$/.test(f.type) ? URL.createObjectURL(f) : null);
   };
 
   const onCropComplete = useCallback((_: Area, px: Area) => setArea(px), []);
@@ -103,11 +110,11 @@ export function UploadLetterForm({ disabled, busy, externalAi, onSubmit }: Props
         <span className="font-display text-lg font-extrabold">
           {file ? `Elegiste: ${file.name}` : 'Toca aquí o arrastra la foto de tu carta'}
         </span>
-        <span className="text-sm text-tinta-suave">JPG, PNG, HEIC o PDF · máximo 10 MB</span>
+        <span className="text-sm text-tinta-suave">Foto JPG, PNG o WebP · máximo 10 MB</span>
         <input
           id={inputId}
           type="file"
-          accept=".jpg,.jpeg,.png,.heic,.heif,.pdf,image/jpeg,image/png,image/heic,application/pdf"
+          accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
           className="sr-only"
           onChange={(e) => pick(e.target.files?.[0])}
           aria-describedby={error ? `${inputId}-err` : undefined}
@@ -151,7 +158,7 @@ export function UploadLetterForm({ disabled, busy, externalAi, onSubmit }: Props
       )}
       {file && !canPreview && (
         <p className="flex items-center gap-2 rounded-xl bg-white/70 p-3 text-sm font-bold">
-          <FileText size={18} aria-hidden="true" /> Este formato no tiene vista previa, pero los duendes lo leerán igual.
+          <FileText size={18} aria-hidden="true" /> Esta foto no tiene vista previa, pero igual llegará al Polo Norte.
         </p>
       )}
 
@@ -172,8 +179,8 @@ export function UploadLetterForm({ disabled, busy, externalAi, onSubmit }: Props
       <p className="flex items-start gap-2 text-xs font-semibold text-tinta-suave">
         <ShieldCheck size={16} className="mt-0.5 shrink-0 text-muerdago" aria-hidden="true" />
         {externalAi
-          ? 'Si la letra es difícil, un ayudante de IA externo (que tu familia aceptó) puede ayudar a leerla.'
-          : 'La carta se lee solo en el taller (nuestro servidor); no se envía a servicios externos.'}{' '}
+          ? 'Un ayudante de IA externo (que tu familia aceptó) transcribirá la letra para armar la lista de regalos.'
+          : 'La foto llega tal cual al taller (nuestro servidor); no se envía a servicios externos.'}{' '}
         Quitamos la ubicación y datos ocultos de la foto. <Link to="/privacidad" className="underline">Más info</Link>
       </p>
 

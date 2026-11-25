@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 export const MAX_UPLOAD_MB = 10;
-export const ACCEPTED = ['image/jpeg', 'image/png', 'image/heic', 'image/heif', 'application/pdf'];
-export const ACCEPTED_EXT = /\.(jpe?g|png|heic|heif|pdf)$/i;
+export const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp'];
+export const ACCEPTED_EXT = /\.(jpe?g|png|webp)$/i;
 
 /** Detección amable de datos que no deberían ir en una carta. */
 const SENSITIVE = [
@@ -31,7 +31,7 @@ export type WriteLetterValues = z.infer<typeof writeLetterSchema>;
 export function validateFile(file: File): string | null {
   if (file.size > MAX_UPLOAD_MB * 1024 * 1024) return `La foto pesa más de ${MAX_UPLOAD_MB} MB.`;
   if (!ACCEPTED.includes(file.type) && !ACCEPTED_EXT.test(file.name)) {
-    return 'Ese formato no lo leen los duendes. Usa JPG, PNG, HEIC o PDF.';
+    return 'Ese formato no lo reciben los duendes. Usa una foto JPG, PNG o WebP.';
   }
   return null;
 }

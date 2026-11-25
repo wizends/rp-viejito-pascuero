@@ -24,15 +24,16 @@ export default function PrivacyPage() {
           <h2 className="text-xl">¿Qué pasa con las fotos?</h2>
           <p>
             Al subirlas las volvemos a dibujar desde cero: así se borran los datos ocultos de la cámara, incluida la
-            ubicación GPS. Cuando la carta se lee bien, la foto se borra. Si necesita ayuda de un duende, la
-            guardamos para que la transcribas tú, y se borra apenas lo hagas o, como máximo, a los 60 días.
+            ubicación GPS. La foto es la carta: solo tú la ves en tu panel, y se borra cuando la borres o, como
+            máximo, a los 60 días.
           </p>
         </section>
         <section>
           <h2 className="text-xl">¿Quién lee la letra manuscrita?</h2>
           <p>
-            Por defecto, todo se procesa en nuestro propio servidor con modelos gratuitos (OCR y TrOCR). Solo si tú
-            lo activas en tu panel, una IA externa con capa gratuita puede ayudar con letras difíciles.
+            Por defecto, nadie: la foto llega tal cual y puedes transcribirla tú si quieres. Solo si lo activas en tu
+            panel, una IA externa con capa gratuita transcribe la letra y arma la lista de regalos; en ese caso la foto
+            se envía a ese proveedor.
           </p>
         </section>
         <section>

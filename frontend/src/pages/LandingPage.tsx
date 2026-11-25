@@ -175,7 +175,7 @@ export function LandingPage() {
               {
                 icon: <MailOpen size={34} strokeWidth={2.25} />,
                 t: 'Escribe o fotografía tu carta',
-                d: 'En el papel mágico o en una hoja de verdad. Los duendes leen letra manuscrita.',
+                d: 'En el papel mágico o en una hoja de verdad: sácale una foto y llega tal cual al Polo Norte.',
                 bg: 'bg-rojo',
                 tilt: -4,
               },

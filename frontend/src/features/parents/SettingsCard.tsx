@@ -14,7 +14,7 @@ export function SettingsCard() {
     onSuccess: (u) => {
       setUser(u);
       qc.setQueryData(['me'], u);
-      toast(u.allow_external_ai ? 'IA externa activada como respaldo.' : 'Listo: todo se leerá solo en nuestro taller.', 'info');
+      toast(u.allow_external_ai ? 'IA activada: transcribirá las próximas fotos de cartas.' : 'Listo: las fotos quedan solo como imagen en nuestro taller.', 'info');
     },
     onError: (e: Error) => toast(e.message, 'error'),
   });
@@ -32,13 +32,13 @@ export function SettingsCard() {
           className="mt-1 h-5 w-5 accent-[var(--dorado-estrella)]"
         />
         <span>
-          <strong className="text-crema">Permitir IA externa para letras difíciles.</strong> Si el OCR y el modelo local
-          no logran leer una foto, se puede enviar a un proveedor externo con capa gratuita. Por defecto está
-          desactivado y nada sale de nuestro servidor.
+          <strong className="text-crema">Permitir que una IA transcriba las fotos de las cartas.</strong> La foto se
+          envía a un proveedor externo con capa gratuita que lee la letra y arma la lista de regalos. Por defecto está
+          desactivado: la foto queda solo como imagen y nada sale de nuestro servidor.
         </span>
       </label>
       <p className="mt-3 text-xs">
-        Las fotos se borran cuando la carta queda leída. Si necesita ayuda, se guarda hasta que la transcribas (máx. 60 días).
+        Las fotos se guardan limpias (sin ubicación ni datos de la cámara) y se borran a los 60 días o cuando borres la carta.
       </p>
     </div>
   );

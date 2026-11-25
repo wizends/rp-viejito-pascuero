@@ -1,12 +1,11 @@
-# Python
+# Backend (Go): base SQLite y fotos locales
+backend/data/
+backend/*.db
+backend/buzon
+backend/buzon.exe
+# restos del backend Python anterior
 backend/.venv/
 __pycache__/
-*.pyc
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-backend/*.db
-backend/data/
 
 # Node
 frontend/node_modules/

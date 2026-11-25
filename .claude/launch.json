@@ -3,15 +3,38 @@
   "configurations": [
     {
       "name": "backend",
-      "runtimeExecutable": "C:\\Users\\boika\\proyectos\\buzon-viejito-pascuero\\backend\\.venv\\Scripts\\python.exe",
-      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--port", "8000"],
-      "cwd": "C:\\Users\\boika\\proyectos\\buzon-viejito-pascuero\\backend",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": [
+        "run",
+        "--rm",
+        "--name",
+        "backend-go",
+        "-p",
+        "8000:8000",
+        "-v",
+        "C:/Users/boika/proyectos/buzon-viejito-pascuero/backend:/src",
+        "-v",
+        "gomodcache:/go/pkg/mod",
+        "-v",
+        "gobuildcache:/root/.cache/go-build",
+        "-w",
+        "/src",
+        "-e",
+        "DATA_DIR=/src/data",
+        "golang:alpine",
+        "go",
+        "run",
+        "./cmd/buzon"
+      ],
       "port": 8000
     },
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "cwd": "C:\\Users\\boika\\proyectos\\buzon-viejito-pascuero\\frontend",
       "port": 5173
     }

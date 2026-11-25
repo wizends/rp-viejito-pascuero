@@ -43,7 +43,7 @@ export interface Letter {
   texto_normalizado: string;
   tono: string | null;
   confianza: number | null;
-  metodo: 'ocr' | 'ia' | 'manual' | 'escrita' | null;
+  metodo: 'ia' | 'manual' | 'escrita' | null;
   pii_masked: boolean;
   has_image: boolean;
   created_at: string;

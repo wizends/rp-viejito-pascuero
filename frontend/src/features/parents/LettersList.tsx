@@ -15,8 +15,7 @@ const STATUS: Record<LetterStatus, { label: string; cls: string }> = {
 };
 
 const METODO: Record<string, string> = {
-  ocr: 'Leída con OCR',
-  ia: 'Leída con IA de visión',
+  ia: 'Transcrita con IA',
   manual: 'Transcrita a mano',
   escrita: 'Escrita en la web',
 };
@@ -102,7 +101,12 @@ function LetterCard({ letter }: { letter: Letter }) {
           {letter.status === 'necesita_ayuda' && (
             <p className="mb-3 flex items-start gap-2 rounded-xl bg-rojo/10 p-3 text-sm font-bold text-rojo-baya">
               <TriangleAlert size={18} className="shrink-0" aria-hidden="true" />
-              Los duendes no lograron leer esta letra. ¿Nos ayudas a transcribirla? La foto se borra apenas guardes.
+              Los duendes no lograron leer esta letra. ¿Nos ayudas a transcribirla?
+            </p>
+          )}
+          {letter.source === 'foto' && !letter.texto_original && letter.status !== 'necesita_ayuda' && (
+            <p className="mb-3 rounded-xl bg-hielo/60 p-3 text-sm font-bold text-noche">
+              Llegó como foto. Si quieres, transcríbela con el lápiz para armar la lista de regalos.
             </p>
           )}
           {letter.has_image && (

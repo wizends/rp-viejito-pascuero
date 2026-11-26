@@ -51,10 +51,13 @@ Gracias al proxy el navegador ve un solo dominio (el de la web): las cookies de 
   | Variable | Valor |
   | --- | --- |
   | `BACKEND_URL` | el dominio de producción del backend, p. ej. `https://buzon-backend.vercel.app` (sin barra final). Sin ella la web queda en modo vitrina y `/api` responde 503. |
+  | `VITE_SITE_URL` | la URL pública de la web, p. ej. `https://buzon.cl` (sin barra final). Se usa en canonical, Open Graph, `robots.txt` y `sitemap.xml`. En Vercel se detecta desde el dominio de producción del proyecto. |
   | `VITE_WS_URL` | lo mismo con `wss://`, p. ej. `wss://buzon-backend.vercel.app` (el proxy de Vercel no reenvía WebSockets) |
   | `VITE_MAP_TILES_URL` | opcional |
 
 Usa el dominio **estable** de producción del backend (Settings → Domains), no la URL de un despliegue puntual, que cambia en cada push.
+
+El build genera `dist/robots.txt` y `dist/sitemap.xml`. Solo se indexan la portada y la política de privacidad; el panel, las postales, el seguimiento y las pantallas de acceso llevan `noindex`. En desarrollo, Vite sirve ambos archivos en `/robots.txt` y `/sitemap.xml`.
 
 En Vercel el backend corre sin procesos de fondo: la carta (y la lectura opcional con IA) se procesa durante la subida, las paradas con hora se completan al consultar el trayecto y el cron diario también avanza paradas y borra fotos vencidas. La web consulta el estado de la carta cada 3 s mientras el Viejito la lee y el seguimiento del niño cada 15 s. Con Redis, además, el seguimiento recibe avisos al instante por WebSocket; sin Redis el backend cierra los WebSockets con el código 4410 y queda solo la consulta. Los avisos de cartas por WebSocket no llegan entre dominios (la cookie de sesión es de la web), por eso esas siempre se consultan.
 

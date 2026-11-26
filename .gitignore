@@ -22,7 +22,9 @@ frontend/.impeccable/
 frontend/.env.local
 
 # Herramientas locales de Claude Code (skills de terceros, ajustes personales)
-.claude/skills/
+.claude/skills/*
+# la skill del repo sí se comparte con el equipo
+!.claude/skills/buzon-dev/
 .claude/settings.local.json
 
 # Salida de build de Vercel

@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { LogOut, Menu as MenuIcon, Volume2, VolumeX } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Suspense, useCallback, useState, type ReactNode } from 'react';
+import { Suspense, useCallback, useLayoutEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate, useOutlet } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { api } from '@/lib/api';
@@ -97,6 +97,11 @@ export function Layout() {
   const { pathname } = useLocation();
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
+  // cada página nueva empieza arriba (la que se va queda fija donde estaba mientras se despide)
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [pathname]);
+
   const logout = async () => {
     setMenuOpen(false);
     await api.logout().catch(() => undefined);
@@ -175,13 +180,18 @@ export function Layout() {
         </motion.div>
       </motion.header>
       <MenuSheet open={menuOpen} onClose={closeMenu} user={!!user} onLogout={logout} />
-      <main id="contenido" tabIndex={-1} className="outline-none">
-        <AnimatePresence mode="wait" initial={false} onExitComplete={() => window.scrollTo({ top: 0 })}>
+      <main id="contenido" tabIndex={-1} className="relative outline-none">
+        {/*
+          La página nueva entra de inmediato y la que se va se despide encima, sin ocupar
+          espacio ni recibir clics. Con mode="wait" la nueva esperaba a que terminara la
+          salida, y dos navegaciones seguidas dejaban la vista pegada hasta recargar.
+        */}
+        <AnimatePresence mode="popLayout" initial={false}>
           <motion.div
             key={pathname}
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } }}
-            exit={{ opacity: 0, y: -10, transition: { duration: 0.18, ease: [0.4, 0, 1, 1] } }}
+            exit={{ opacity: 0, y: -10, pointerEvents: 'none', transition: { duration: 0.18, ease: [0.4, 0, 1, 1] } }}
           >
             <RouteErrorBoundary>
               <Suspense fallback={<PageFallback />}>

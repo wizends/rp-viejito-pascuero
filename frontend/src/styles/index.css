@@ -77,6 +77,8 @@
   html {
     scrollbar-color: var(--turquesa) var(--cielo-claro);
     scrollbar-width: thin;
+    /* el espacio de la barra queda siempre reservado: al pasar de una página larga a una corta, el menú no salta */
+    scrollbar-gutter: stable;
   }
   input,
   textarea {

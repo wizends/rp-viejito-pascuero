@@ -4,6 +4,7 @@ import { Bloom, EffectComposer, SMAA, ToneMapping } from '@react-three/postproce
 import { ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
 import { Suspense, useEffect, useState } from 'react';
+import { useIsPresent } from 'framer-motion';
 import { useReducedMotion } from '@/lib/useReducedMotion';
 import { useScene } from '@/stores/scene';
 import { CameraRig } from './CameraRig';
@@ -73,9 +74,12 @@ export default function Scene() {
   const forced = SCENE_DEBUG.forcedQuality;
   const [tier, setTier] = useState(forced ?? (mobile ? 1 : 0));
   const post = tier < 2 && !SCENE_DEBUG.noPost;
+  // mientras la portada se despide (cambio de ruta), la escena deja de dibujar: queda el último cuadro
+  const isPresent = useIsPresent();
 
   return (
     <Canvas
+      frameloop={isPresent ? 'always' : 'never'}
       dpr={[1, 2]}
       camera={{ position: (mobile ? CAMERA.mobilePos : CAMERA.pos).toArray(), fov: mobile ? 52 : 44, near: 0.1, far: 40 }}
       gl={{ antialias: false, powerPreference: 'high-performance', alpha: false, stencil: false }}

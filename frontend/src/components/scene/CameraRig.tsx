@@ -27,7 +27,7 @@ const SHOTS: Record<string, [THREE.Vector3, THREE.Vector3]> = {
 // por una página, y una deriva tipo "Ken Burns" muy leve mientras nada ocurre.
 const RAIL_STIFFNESS = 3.5;
 export function CameraRig({ reduced, mobile }: { reduced: boolean; mobile: boolean }) {
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
   const pointer = useRef({ x: 0, y: 0 });
   const s = useMemo(
     () => ({
@@ -45,8 +45,11 @@ export function CameraRig({ reduced, mobile }: { reduced: boolean; mobile: boole
   useEffect(() => {
     if (reduced) return;
     const onMove = (e: PointerEvent) => {
-      pointer.current.x = (e.clientX / window.innerWidth) * 2 - 1;
-      pointer.current.y = (e.clientY / window.innerHeight) * 2 - 1;
+      // solo sigue al mouse sobre la escena: al ir al menú o a otra parte, la cámara se queda quieta
+      const r = gl.domElement.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
+      pointer.current.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+      pointer.current.y = ((e.clientY - r.top) / r.height) * 2 - 1;
     };
     const onTilt = (e: DeviceOrientationEvent) => {
       if (e.gamma == null || e.beta == null) return;
@@ -59,7 +62,7 @@ export function CameraRig({ reduced, mobile }: { reduced: boolean; mobile: boole
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('deviceorientation', onTilt);
     };
-  }, [reduced]);
+  }, [reduced, gl]);
 
   useFrame((_, rawDt) => {
     const dt = clampDt(rawDt);
